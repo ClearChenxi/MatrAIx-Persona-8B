@@ -1,8 +1,10 @@
 """Modal app for Harbor jobs.
 
 Survey and chat use the ``harbor_host_job`` Function. Web and Linux use a
-Sandbox from this app’s Docker image (task images cached on
-``matraix-docker-images``). Deploy once from a MatrAIx checkout:
+Sandbox from this app’s Docker image. Playwright tars on
+``matraix-docker-images`` are baked into the worker Image at build time so
+concurrent sandboxes do not all ``docker load`` from the shared Volume.
+Deploy once from a MatrAIx checkout:
 
     uv run --extra modal modal deploy application/playground/backend/service/modal_host_app.py
 
@@ -86,6 +88,7 @@ _PYTHONPATH = (
 _WORKER_ENV = {
     "MATRIX_REPO_ROOT": MODAL_REMOTE_REPO,
     "PYTHONPATH": _PYTHONPATH,
+    "MATRIX_DOCKER_HOST_NETWORK": "1",
 }
 
 
@@ -102,6 +105,39 @@ def _install_repo(image: modal.Image) -> modal.Image:
             )
         )
     )
+
+
+volume = modal.Volume.from_name(_VOLUME_NAME, create_if_missing=True)
+docker_images_volume = modal.Volume.from_name(_DOCKER_VOLUME_NAME, create_if_missing=True)
+
+
+def _volume_readonly(volume: modal.Volume) -> modal.Volume:
+    """Bake must not commit a stale Volume snapshot over the warmed tar."""
+    method = getattr(volume, "with_mount_options", None)
+    if not callable(method):
+        return volume
+    try:
+        return method(read_only=True)
+    except Exception:
+        return volume
+
+
+_secrets: list[modal.Secret] = []
+try:
+    _secrets.append(modal.Secret.from_name(_SECRET_NAME))
+except Exception:
+    pass
+
+
+def _bake_cached_task_images(token: str = "") -> None:
+    """Load Volume Playwright tars into this worker image (once per Image.build).
+
+    ``token`` is only a cache key so a new digest rebuilds this layer.
+    """
+    del token
+    from backend.service.modal_docker_prebuild import bake_cached_images_into_worker
+
+    bake_cached_images_into_worker(Path("/modal-docker-images"))
 
 
 image = _install_repo(
@@ -130,15 +166,16 @@ docker_image = _install_repo(
         "-o /usr/libexec/docker/cli-plugins/docker-compose",
         "chmod +x /usr/libexec/docker/cli-plugins/docker-compose",
     )
+).run_function(
+    _bake_cached_task_images,
+    volumes={"/modal-docker-images": _volume_readonly(docker_images_volume)},
+    env=_WORKER_ENV,
+    timeout=60 * 60,
+    memory=8192,
+    kwargs={
+        "token": (os.environ.get("MATRIX_DOCKER_BAKE_TOKEN") or "").strip(),
+    },
 )
-
-volume = modal.Volume.from_name(_VOLUME_NAME, create_if_missing=True)
-docker_images_volume = modal.Volume.from_name(_DOCKER_VOLUME_NAME, create_if_missing=True)
-_secrets: list[modal.Secret] = []
-try:
-    _secrets.append(modal.Secret.from_name(_SECRET_NAME))
-except Exception:
-    pass
 
 app = modal.App(MODAL_HOST_APP_NAME, image=image)
 

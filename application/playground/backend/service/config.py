@@ -147,6 +147,10 @@ PERSONA_MODEL_KNOB_META: Dict[str, Dict[str, str]] = {
         "label": "Qwen 3 VL Flash",
         "description": "DashScope fast vision model.",
     },
+    "dashscope/deepseek-v4.1-flash": {
+        "label": "DeepSeek V4.1 Flash",
+        "description": "DeepSeek V4.1 Flash via DashScope OpenAI-compatible API.",
+    },
     "dashscope/deepseek-v4-pro": {
         "label": "DeepSeek V4 Pro",
         "description": "DeepSeek via DashScope OpenAI-compatible API.",

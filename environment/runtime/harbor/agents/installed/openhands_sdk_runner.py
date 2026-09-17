@@ -33,6 +33,41 @@ from openhands.tools.terminal import TerminalTool
 
 logger = get_logger(__name__)
 
+
+def patch_litellm_cache_token_compat() -> None:
+    """Keep DashScope usage accounting from crashing OpenHands 1.49.x.
+
+    LiteLLM's ``PromptTokensDetailsWrapper`` has ``cached_tokens`` but not
+    Anthropic's ``cache_creation_tokens``. Older SDK telemetry reads the latter
+    unconditionally and raises AttributeError after a successful chat.
+    """
+    try:
+        from openhands.sdk.llm.utils import telemetry as telemetry_mod
+    except ImportError:
+        return
+    cls = getattr(telemetry_mod, "Telemetry", None) or getattr(
+        telemetry_mod, "LLMTelemetry", None
+    )
+    original = getattr(cls, "_cache_buckets", None) if cls is not None else None
+    if original is None:
+        return
+
+    def _cache_buckets(usage: Any) -> tuple[int, int]:
+        try:
+            return original(usage)
+        except AttributeError:
+            details = getattr(usage, "prompt_tokens_details", None) or getattr(
+                usage, "input_tokens_details", None
+            )
+            if details is None:
+                return 0, 0
+            cache_read = getattr(details, "cached_tokens", None) or 0
+            cache_write = getattr(details, "cache_creation_tokens", None) or 0
+            return int(cache_read or 0), int(cache_write or 0)
+
+    cls._cache_buckets = staticmethod(_cache_buckets)
+
+
 _DATA_URL_RE = re.compile(
     r"^data:(?P<mime>image/[a-zA-Z0-9.+-]+);base64,(?P<data>.+)$",
     re.DOTALL,
@@ -457,6 +492,7 @@ def _maybe_browser_tool() -> Tool | None:
 
 
 def main():
+    patch_litellm_cache_token_compat()
     parser = argparse.ArgumentParser(description="Run OpenHands SDK agent")
     parser.add_argument("--instruction", required=True, help="Task instruction")
     parser.add_argument("--logs-dir", required=True, help="Directory for logs")

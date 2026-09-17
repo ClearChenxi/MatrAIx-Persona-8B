@@ -351,3 +351,26 @@ def test_browser_use_routes_deepseek_and_zai(monkeypatch):
         "api_key": "sk-zai-test",
         "base_url": "https://api.z.ai/api/paas/v4",
     }
+
+
+def test_openhands_cache_token_compat_swallows_missing_field() -> None:
+    telemetry = types.ModuleType("openhands.sdk.llm.utils.telemetry")
+
+    class _Telemetry:
+        @staticmethod
+        def _cache_buckets(_usage):
+            raise AttributeError(
+                "'PromptTokensDetailsWrapper' object has no attribute "
+                "'cache_creation_tokens'"
+            )
+
+    telemetry.Telemetry = _Telemetry
+    sys.modules["openhands.sdk.llm.utils.telemetry"] = telemetry
+    sys.modules["openhands.sdk.llm.utils"] = types.ModuleType("openhands.sdk.llm.utils")
+    sys.modules["openhands.sdk.llm"] = types.ModuleType("openhands.sdk.llm")
+
+    oh.patch_litellm_cache_token_compat()
+    usage = SimpleNamespace(
+        prompt_tokens_details=SimpleNamespace(cached_tokens=3)
+    )
+    assert _Telemetry._cache_buckets(usage) == (3, 0)

@@ -243,11 +243,14 @@ class OpenHandsSDK(BaseInstalledAgent):
         # dashscope talks through its OpenAI-compatible endpoint; prefer that base
         # for dashscope models even if a global LLM_BASE_URL targets another provider.
         if self.model_name and self.model_name.startswith("dashscope/"):
-            llm_base_url = (
-                self._get_env("DASHSCOPE_API_BASE")
-                or self._get_env("LLM_BASE_URL")
-                or "https://dashscope.aliyuncs.com/compatible-mode/v1"
-            )
+            inherited = self._get_env("LLM_BASE_URL") or ""
+            dashscope_base = self._get_env("DASHSCOPE_API_BASE") or ""
+            if dashscope_base:
+                llm_base_url = dashscope_base
+            elif "dashscope" in inherited.lower() or "aliyuncs.com" in inherited.lower():
+                llm_base_url = inherited
+            else:
+                llm_base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
         else:
             llm_base_url = self._get_env("LLM_BASE_URL")
         if llm_base_url is not None:

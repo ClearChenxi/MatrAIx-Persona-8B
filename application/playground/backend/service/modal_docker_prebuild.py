@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import tomllib
 from pathlib import Path
@@ -19,6 +20,7 @@ from typing import Callable
 
 DOCKER_CACHE_ENV = "MATRIX_DOCKER_IMAGE_CACHE"
 DEFAULT_DOCKER_CACHE_DIR = "/modal-docker-images"
+BAKED_DOCKER_CACHE_DIR = Path("/opt/matraix-docker-cache")
 PREBUILT_IMAGE_PREFIX = "matraix-prebuilt"
 _SKIP_HASH_PARTS = frozenset({".git", "__pycache__", ".pytest_cache", "node_modules"})
 
@@ -142,6 +144,7 @@ def prebuilt_image_tag(digest: str) -> str:
 
 
 def docker_cache_dir() -> Path:
+    """Writable Volume/local cache used to save newly built images."""
     env = (os.environ.get(DOCKER_CACHE_ENV) or "").strip()
     if env:
         return Path(env)
@@ -149,6 +152,104 @@ def docker_cache_dir() -> Path:
     if default.is_dir():
         return default
     return Path("/tmp/matraix-docker-images")
+
+
+def _baked_cache_dir() -> Path:
+    override = (os.environ.get("MATRIX_DOCKER_BAKED_CACHE") or "").strip()
+    return Path(override) if override else BAKED_DOCKER_CACHE_DIR
+
+
+def cached_archive_path(digest: str, cache_dir: Path | None = None) -> Path | None:
+    """Find ``{digest}.tar`` in the baked image cache, then the Volume cache."""
+    roots: list[Path] = []
+    if cache_dir is not None:
+        roots.append(Path(cache_dir))
+    else:
+        roots.append(_baked_cache_dir())
+        roots.append(docker_cache_dir())
+    seen: set[str] = set()
+    name = "{}.tar".format(digest)
+    for root in roots:
+        key = str(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        for archive in (root / name,):
+            if _usable_archive(archive):
+                return archive
+        try:
+            matches = sorted(root.glob(name))
+        except OSError:
+            matches = []
+        for archive in matches:
+            if _usable_archive(archive):
+                return archive
+    return None
+
+
+def _usable_archive(archive: Path) -> bool:
+    try:
+        return archive.exists() and archive.stat().st_size > 0
+    except OSError:
+        return False
+
+
+def bake_cached_images_into_worker(
+    volume_root: Path,
+    *,
+    baked_root: Path | None = None,
+    docker: "DockerCli | None" = None,
+    start_daemon: bool = True,
+) -> list[str]:
+    """Copy Volume tars into the worker image and docker-load them.
+
+    After this runs inside ``Image.run_function``, sandboxes start with the
+    Playwright image already in the Docker graph (or at least a local tar, so
+    they do not all ``docker load`` from the shared Volume).
+    """
+    baked = baked_root if baked_root is not None else BAKED_DOCKER_CACHE_DIR
+    baked.mkdir(parents=True, exist_ok=True)
+    if not volume_root.is_dir():
+        print("bake docker cache: {} is missing".format(volume_root), flush=True)
+        return []
+    tars = sorted(
+        path
+        for path in volume_root.glob("*.tar")
+        if path.is_file() and path.stat().st_size > 0
+    )
+    if not tars:
+        print("bake docker cache: no *.tar under {}".format(volume_root), flush=True)
+        return []
+    copied: list[str] = []
+    for archive in tars:
+        dest = baked / archive.name
+        if archive.resolve() != dest.resolve():
+            shutil.copy2(archive, dest)
+        copied.append(dest.name)
+        print("baked docker tar {}".format(dest.name), flush=True)
+    if start_daemon:
+        try:
+            ensure_docker_daemon()
+        except DockerPrebuildError as exc:
+            print(
+                "bake docker cache: daemon unavailable ({}); tars copied only".format(exc),
+                flush=True,
+            )
+            return copied
+    cli = docker or DockerCli()
+    for name in copied:
+        dest = baked / name
+        try:
+            cli.load(dest)
+            print("baked docker image {}".format(name), flush=True)
+        except DockerPrebuildError as exc:
+            print(
+                "bake docker cache: load {} failed ({}); tar is still local".format(
+                    name, exc
+                ),
+                flush=True,
+            )
+    return copied
 
 
 def patch_task_toml_docker_image(toml_path: Path, image: str) -> None:
@@ -199,6 +300,8 @@ def ensure_docker_daemon(
                 dockerd,
                 "--host=unix:///var/run/docker.sock",
                 "--iptables=false",
+                "--dns=8.8.8.8",
+                "--dns=1.1.1.1",
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -243,24 +346,52 @@ def prepare_docker_environment_for_job(
     cache_tag = prebuilt_image_tag(digest)
     harbor_tag = harbor_main_image_name(task_short_name(task_dir))
     cache_root = Path(cache_dir) if cache_dir is not None else docker_cache_dir()
-    cache_root.mkdir(parents=True, exist_ok=True)
-    archive = cache_root / "{}.tar".format(digest)
-    lock_path = cache_root / "{}.lock".format(digest)
+    try:
+        cache_root.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    archive = cached_archive_path(
+        digest,
+        cache_dir=cache_root if cache_dir is not None else None,
+    )
+    if archive is None and cache_dir is None:
+        for extra in (
+            _baked_cache_dir() / "{}.tar".format(digest),
+            Path(DEFAULT_DOCKER_CACHE_DIR) / "{}.tar".format(digest),
+        ):
+            if _usable_archive(extra):
+                archive = extra
+                break
+    write_archive = cache_root / "{}.tar".format(digest)
+    # Volume is mounted read-only to avoid extra commits; flock lives on tmpfs.
+    lock_path = Path("/tmp") / "matraix-docker-{}.lock".format(digest)
     with _file_lock(lock_path):
         if cli.image_exists(cache_tag):
             if not cli.image_exists(harbor_tag):
                 cli.tag(cache_tag, harbor_tag)
-        elif archive.is_file() and archive.stat().st_size > 0:
+        elif archive is not None:
             cli.load(archive)
             if not cli.image_exists(cache_tag):
                 raise DockerPrebuildError(
                     "docker load of {} did not produce {}".format(archive, cache_tag)
                 )
             cli.tag(cache_tag, harbor_tag)
+        elif not _cache_writable(cache_root):
+            raise DockerPrebuildError(
+                "missing docker image cache {} — warm the Volume once "
+                "before spawning many sandboxes".format(write_archive)
+            )
         else:
             cli.build(environment_dir, cache_tag)
             cli.tag(cache_tag, harbor_tag)
-            cli.save(cache_tag, archive)
+            if _cache_writable(cache_root):
+                try:
+                    cli.save(cache_tag, write_archive)
+                except (DockerPrebuildError, OSError) as exc:
+                    print(
+                        "docker save skipped for {}: {}".format(write_archive, exc),
+                        flush=True,
+                    )
     toml_path = task_dir / "task.toml"
     if toml_path.is_file():
         patch_task_toml_docker_image(toml_path, cache_tag)
@@ -279,14 +410,15 @@ class DockerCli:
 
     def build(self, context: Path, tag: str) -> None:
         completed = _run(
-            ["docker", "build", "-t", tag, str(context)],
+            ["docker", "build", "--network=host", "-t", tag, str(context)],
             check=False,
         )
         if completed.returncode != 0:
+            detail = "\n".join(
+                part for part in (_decode(completed.stderr), _decode(completed.stdout)) if part
+            )
             raise DockerPrebuildError(
-                "docker build failed for {}: {}".format(
-                    context, _decode(completed.stderr) or _decode(completed.stdout)
-                )
+                "docker build failed for {}: {}".format(context, detail[-4000:])
             )
 
     def tag(self, source: str, dest: str) -> None:
@@ -303,7 +435,10 @@ class DockerCli:
             check=False,
         )
         if completed.returncode != 0:
-            dest.unlink(missing_ok=True)
+            try:
+                dest.unlink(missing_ok=True)
+            except OSError:
+                pass
             raise DockerPrebuildError("docker save {} failed".format(tag))
 
     def load(self, archive: Path) -> None:
@@ -339,6 +474,18 @@ def _decode(blob: bytes | None) -> str:
     if not blob:
         return ""
     return blob.decode("utf-8", errors="replace").strip()
+
+
+def _cache_writable(cache_root: Path) -> bool:
+    """True only if we can actually create a file. Mounts can be RO with 0755."""
+    try:
+        cache_root.mkdir(parents=True, exist_ok=True)
+        probe = cache_root / ".matraix-write-probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
 
 
 def _file_lock(path: Path):

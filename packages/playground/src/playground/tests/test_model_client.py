@@ -30,6 +30,26 @@ def test_dashscope_openai_client_kwargs_reads_env(monkeypatch):
     }
 
 
+def test_dashscope_ignores_foreign_llm_base_url(monkeypatch):
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-dashscope-test")
+    monkeypatch.delenv("DASHSCOPE_API_BASE", raising=False)
+    monkeypatch.setenv("LLM_BASE_URL", "https://api.z.ai/api/paas/v4")
+
+    kwargs = dashscope_openai_client_kwargs("dashscope/deepseek-v4.1-flash")
+    assert kwargs["base_url"] == DASHSCOPE_DEFAULT_BASE_URL
+
+
+def test_dashscope_keeps_explicit_dashscope_base(monkeypatch):
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-dashscope-test")
+    monkeypatch.setenv(
+        "DASHSCOPE_API_BASE", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    )
+    monkeypatch.setenv("LLM_BASE_URL", "https://api.z.ai/api/paas/v4")
+
+    kwargs = dashscope_openai_client_kwargs("dashscope/deepseek-v4.1-flash")
+    assert kwargs["base_url"] == "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+
+
 def test_build_json_client_routes_dashscope_to_openai_compatible(monkeypatch):
     monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-dashscope-test")
     created: list[dict[str, str]] = []

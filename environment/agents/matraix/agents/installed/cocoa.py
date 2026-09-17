@@ -158,17 +158,15 @@ class CocoaHarborAgent(BaseInstalledAgent):
                 env[key] = value
 
         if self.model_name.startswith("dashscope/"):
-            if "LLM_BASE_URL" not in env:
-                env["LLM_BASE_URL"] = (
-                    self._get_env("DASHSCOPE_API_BASE")
-                    or "https://dashscope.aliyuncs.com/compatible-mode/v1"
-                )
-            if (
-                "LLM_API_KEY" not in env
-                and "OPENAI_API_KEY" not in env
-                and self._get_env("DASHSCOPE_API_KEY")
-            ):
-                env["LLM_API_KEY"] = self._get_env("DASHSCOPE_API_KEY")  # type: ignore[assignment]
+            inherited = env.get("LLM_BASE_URL") or ""
+            dashscope_base = self._get_env("DASHSCOPE_API_BASE") or ""
+            if dashscope_base:
+                env["LLM_BASE_URL"] = dashscope_base
+            elif "dashscope" not in inherited.lower() and "aliyuncs.com" not in inherited.lower():
+                env["LLM_BASE_URL"] = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            dash_key = self._get_env("DASHSCOPE_API_KEY")
+            if dash_key:
+                env["LLM_API_KEY"] = dash_key
         elif (
             self.model_name.startswith("gemini/") or self.model_name.startswith("google/")
         ) and "LLM_API_KEY" not in env:

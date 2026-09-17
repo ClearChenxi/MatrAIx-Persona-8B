@@ -33,6 +33,10 @@ from harbor.environments.docker import (
     write_mounts_compose_file,
     write_resources_compose_file,
 )
+from harbor.environments.docker.host_network import (
+    build_host_network_overlay,
+    host_network_requested,
+)
 from harbor.environments.docker.compose_env import (
     ComposeInfraEnvVars,
     legacy_log_mount_env_vars,
@@ -163,6 +167,8 @@ class DockerEnvironment(BaseEnvironment):
         self._mounts_compose_path: Path | None = None
         self._resources_compose_temp_dir: tempfile.TemporaryDirectory | None = None
         self._resources_compose_path: Path | None = None
+        self._host_network_compose_temp_dir: tempfile.TemporaryDirectory | None = None
+        self._host_network_compose_path: Path | None = None
 
         # Select the platform-specific file-transfer and exec helpers.
         if self._is_windows_container:
@@ -274,6 +280,9 @@ class DockerEnvironment(BaseEnvironment):
         if self._mounts_compose_path:
             paths.append(self._mounts_compose_path)
 
+        if self._host_network_compose_path:
+            paths.append(self._host_network_compose_path)
+
         if self._network_disabled:
             paths.append(self._DOCKER_COMPOSE_NO_NETWORK_PATH)
 
@@ -331,6 +340,43 @@ class DockerEnvironment(BaseEnvironment):
         finally:
             self._resources_compose_temp_dir = None
             self._resources_compose_path = None
+
+    def _write_host_network_compose_file(self) -> Path | None:
+        """Give nested dockerd (--iptables=false) a usable public egress path."""
+        self._cleanup_host_network_compose_file()
+        if self._network_disabled or not host_network_requested():
+            return None
+        self._host_network_compose_temp_dir = tempfile.TemporaryDirectory()
+        path = (
+            Path(self._host_network_compose_temp_dir.name)
+            / "docker-compose-host-network.yaml"
+        )
+        extra = list(self.extra_docker_compose_paths)
+        extra.append(
+            self._DOCKER_COMPOSE_PREBUILT_PATH
+            if self._use_prebuilt
+            else self._DOCKER_COMPOSE_BUILD_PATH
+        )
+        path.write_text(
+            build_host_network_overlay(
+                self.environment_dir,
+                use_prebuilt=self._use_prebuilt,
+                extra_compose_paths=extra,
+            ),
+            encoding="utf-8",
+        )
+        return path
+
+    def _cleanup_host_network_compose_file(self) -> None:
+        if self._host_network_compose_temp_dir is None:
+            return
+        try:
+            self._host_network_compose_temp_dir.cleanup()
+        except OSError as e:
+            self.logger.debug(f"Failed to remove host-network compose file: {e}")
+        finally:
+            self._host_network_compose_temp_dir = None
+            self._host_network_compose_path = None
 
     @property
     def _main_image_name(self) -> str:
@@ -532,6 +578,7 @@ class DockerEnvironment(BaseEnvironment):
             docker_image=self.task_env_config.docker_image,
             force_build=force_build,
         )
+        self._host_network_compose_path = self._write_host_network_compose_file()
 
         # Fail fast if the daemon mode disagrees with the task's declared OS.
         self._validate_daemon_mode()
@@ -625,6 +672,7 @@ class DockerEnvironment(BaseEnvironment):
         finally:
             self._cleanup_mounts_compose_file()
             self._cleanup_resources_compose_file()
+            self._cleanup_host_network_compose_file()
 
     async def upload_file(self, source_path: Path | str, target_path: str):
         await self._platform.upload_file(source_path, target_path)

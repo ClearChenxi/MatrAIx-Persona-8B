@@ -34,6 +34,12 @@ def dashscope_model_id(model: str) -> str:
     return value
 
 
+def dashscope_compatible_base_url(raw: str) -> bool:
+    """True when ``raw`` is an Alibaba DashScope OpenAI-compatible endpoint."""
+    lowered = (raw or "").strip().lower()
+    return "dashscope" in lowered or "aliyuncs.com" in lowered
+
+
 def dashscope_openai_client_kwargs(model: str) -> Dict[str, str]:
     """OpenAI SDK kwargs for Alibaba DashScope compatible-mode chat."""
     api_key = (os.environ.get("DASHSCOPE_API_KEY") or "").strip()
@@ -41,11 +47,14 @@ def dashscope_openai_client_kwargs(model: str) -> Dict[str, str]:
         raise RuntimeError(
             "DASHSCOPE_API_KEY is required for persona model {!r}".format(model)
         )
-    base_url = (
-        os.environ.get("DASHSCOPE_API_BASE")
-        or os.environ.get("LLM_BASE_URL")
-        or DASHSCOPE_DEFAULT_BASE_URL
-    ).strip()
+    explicit = (os.environ.get("DASHSCOPE_API_BASE") or "").strip()
+    inherited = (os.environ.get("LLM_BASE_URL") or "").strip()
+    if explicit:
+        base_url = explicit
+    elif dashscope_compatible_base_url(inherited):
+        base_url = inherited
+    else:
+        base_url = DASHSCOPE_DEFAULT_BASE_URL
     return {
         "model": dashscope_model_id(model),
         "api_key": api_key,

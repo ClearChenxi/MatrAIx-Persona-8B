@@ -1965,6 +1965,7 @@ class HarborJobService:
         chat_application_context: str | None,
         chat_max_turns: int | None,
         trial_profile: str | None,
+        respawn_failed: bool = True,
     ) -> None:
         del os_app_submission_profile
         from backend.service.cohort_shard_planner import shard_concurrency_from_env
@@ -2000,7 +2001,12 @@ class HarborJobService:
             runner = self._cloud_host_runner(dispatch)
             if self._runner_supports_spawn(runner):
                 codes, errors = self._spawn_and_wait_cloud_shards(
-                    dispatch, job_name, work, env, runner
+                    dispatch,
+                    job_name,
+                    work,
+                    env,
+                    runner,
+                    respawn_failed=respawn_failed,
                 )
             elif len(work) == 1:
                 code, error = _run_one(work[0])
@@ -2107,6 +2113,7 @@ class HarborJobService:
             chat_application_context=meta.get("chatApplicationContext"),
             chat_max_turns=meta.get("chatMaxTurns"),
             trial_profile=meta.get("trialProfile"),
+            respawn_failed=False,
         )
 
     def _cloud_host_runner(self, dispatch: str) -> Any:
@@ -2168,6 +2175,8 @@ class HarborJobService:
         work: list[tuple[str, Path]],
         env: dict[str, str],
         runner: Any,
+        *,
+        respawn_failed: bool = True,
     ) -> tuple[list[int], list[str]]:
         from backend.service.modal_host_job import load_cloud_run, save_cloud_run
 
@@ -2185,19 +2194,44 @@ class HarborJobService:
             if isinstance(row, dict) and row.get("key"):
                 by_key[str(row["key"])] = row
         handles: dict[str, tuple[Any, str, Any]] = {}
+        pending: list[tuple[str, Any]] = []
+        codes: list[int] = []
+        errors: list[str] = []
         for shard_key, shard_path in work:
             request = self._cloud_host_request(dispatch, job_name, shard_path, shard_key, env)
             row = by_key.get(shard_key) or {"key": shard_key}
             call_id = str(row.get("callId") or "").strip()
-            call = None
-            if not call_id:
+            shard_state = str(row.get("state") or "").strip()
+            if shard_state == "completed":
+                codes.append(0)
+            elif call_id and shard_state == "spawned":
+                handles[shard_key] = (None, call_id, request)
+            elif respawn_failed:
+                pending.append((shard_key, request))
+        spawn_many = getattr(runner, "spawn_many", None)
+        if pending and callable(spawn_many):
+            spawned = spawn_many([request for _key, request in pending])
+            for (shard_key, request), (call_id, call) in zip(pending, spawned):
+                row = by_key.get(shard_key) or {"key": shard_key}
+                row["callId"] = call_id
+                row["state"] = "spawned"
+                by_key[shard_key] = row
+                handles[shard_key] = (call, call_id, request)
+            state["shards"] = list(by_key.values())
+            save_cloud_run(job_dir, state)
+        else:
+            for shard_key, request in pending:
                 call_id, call = runner.spawn(request)
+                row = by_key.get(shard_key) or {"key": shard_key}
                 row["callId"] = call_id
                 row["state"] = "spawned"
                 by_key[shard_key] = row
                 state["shards"] = list(by_key.values())
                 save_cloud_run(job_dir, state)
-            handles[shard_key] = (call, call_id, request)
+                handles[shard_key] = (call, call_id, request)
+
+        if not handles:
+            return codes, errors
 
         def _wait_one(shard_key: str) -> tuple[int, str | None]:
             call, call_id, request = handles[shard_key]
@@ -2225,29 +2259,37 @@ class HarborJobService:
             except Exception as exc:  # noqa: BLE001
                 return 1, str(exc)
 
-        codes: list[int] = []
-        errors: list[str] = []
         workers = max(1, len(handles))
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {pool.submit(_wait_one, key): key for key in handles}
-            for future in as_completed(futures):
-                key = futures[future]
-                code, error = future.result()
-                codes.append(code)
-                if error:
-                    errors.append(error)
-                row = by_key.get(key) or {"key": key}
-                row["state"] = "completed" if code == 0 else "failed"
-                by_key[key] = row
-                state["shards"] = list(by_key.values())
-                save_cloud_run(job_dir, state)
-                request = handles[key][2]
-                cleanup = getattr(runner, "cleanup", None)
-                if dispatch == "gke_workers" and callable(cleanup):
+        try:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {pool.submit(_wait_one, key): key for key in handles}
+                for future in as_completed(futures):
+                    key = futures[future]
+                    code, error = future.result()
+                    codes.append(code)
+                    if error:
+                        errors.append(error)
+                    row = by_key.get(key) or {"key": key}
+                    row["state"] = "completed" if code == 0 else "failed"
+                    by_key[key] = row
+                    state["shards"] = list(by_key.values())
+                    save_cloud_run(job_dir, state)
+                    request = handles[key][2]
+                    cleanup = getattr(runner, "cleanup", None)
+                    if dispatch == "gke_workers" and callable(cleanup):
+                        try:
+                            cleanup(request)
+                        except Exception:
+                            pass
+        except BaseException:
+            for call, _call_id, _request in handles.values():
+                terminate = getattr(call, "terminate", None)
+                if callable(terminate):
                     try:
-                        cleanup(request)
+                        terminate()
                     except Exception:
                         pass
+            raise
         return codes, errors
 
     def _invoke_modal_host(

@@ -27,6 +27,12 @@ SANDBOX_CALL_PREFIX = "sandbox:"
 MODAL_DOCKER_IMAGES_VOLUME_NAME = "matraix-docker-images"
 MODAL_REMOTE_REPO = "/matraix"
 HARBOR_MODULE_COMMAND = ("python", "-m", "harbor.cli.main", "run")
+MODAL_HOST_NETWORK_COMPOSE_REL = (
+    "environment/runtime/harbor/environments/docker/docker-compose-host-network.yaml"
+)
+MODAL_OPENHANDS_RUNNER_REL = (
+    "environment/runtime/harbor/agents/installed/openhands_sdk_runner.py"
+)
 _PRESERVE_ON_MERGE = frozenset({"compute.json"})
 _SKIP_ON_MERGE = frozenset({"result.json", "lock.json", "config.json"})
 _LIVE_STATUS_FILENAME = "live_status.json"
@@ -54,7 +60,10 @@ _SECRET_ENV_KEYS = (
     "GEMINI_API_KEY",
     "XAI_API_KEY",
     "DEEPSEEK_API_KEY",
+    "DEEPSEEK_API_BASE",
     "ZAI_API_KEY",
+    "ZAI_API_BASE",
+    "LLM_BASE_URL",
     "LLM_API_KEY",
     "USE_COMPUTER_API_KEY",
     "TOGETHER_API_KEY",
@@ -243,6 +252,10 @@ def _iter_trial_dirs(job_dir: Path) -> list[Path]:
     )
 
 
+def job_dir_has_trials(job_dir: Path) -> bool:
+    return any((path / "result.json").is_file() for path in _iter_trial_dirs(job_dir))
+
+
 def _trial_live_state(trial_dir: Path) -> str:
     if not trial_dir.is_dir():
         return "pending"
@@ -311,6 +324,105 @@ def rewrite_job_artifact_paths(
             path.write_text(updated, encoding="utf-8")
 
 
+def _host_network_compose_text(repo_root: str | Path | None = None) -> str:
+    if repo_root:
+        path = Path(repo_root) / MODAL_HOST_NETWORK_COMPOSE_REL
+        if path.is_file():
+            return path.read_text(encoding="utf-8")
+    try:
+        from harbor.environments.docker.host_network import MAIN_HOST_NETWORK_COMPOSE
+    except ImportError:
+        return "services:\n  main:\n    network_mode: host\n"
+    return MAIN_HOST_NETWORK_COMPOSE
+
+
+def attach_nested_docker_host_network(config_yaml: str) -> str:
+    """Point Harbor docker jobs at a host-network overlay.
+
+    Nested Modal dockerd cannot NAT bridge traffic. The overlay is shipped in
+    the sandbox payload so a stale worker Image still picks it up.
+    """
+    from backend.service.modal_docker_prebuild import harbor_environment_type
+
+    if harbor_environment_type(config_yaml) != "docker":
+        return config_yaml
+    try:
+        import yaml
+    except ImportError:
+        return config_yaml
+    loaded = yaml.safe_load(config_yaml)
+    if not isinstance(loaded, dict):
+        return config_yaml
+    block = loaded.get("environment")
+    if not isinstance(block, dict):
+        block = {}
+        loaded["environment"] = block
+    extras = [
+        str(item).strip()
+        for item in (block.get("extra_docker_compose") or [])
+        if str(item).strip()
+    ]
+    if MODAL_HOST_NETWORK_COMPOSE_REL not in extras:
+        extras.append(MODAL_HOST_NETWORK_COMPOSE_REL)
+    block["extra_docker_compose"] = extras
+    return yaml.safe_dump(loaded, sort_keys=False)
+
+
+def collect_local_repo_files(config_yaml: str, repo_root: str | Path) -> dict[str, str]:
+    """Ship persona YAML referenced by a shard config into the Modal payload.
+
+    The worker image is a deploy-time snapshot and does not include 1M cohort
+    files materialized after deploy.
+    """
+    try:
+        import yaml
+    except ImportError:
+        return {}
+    loaded = yaml.safe_load(config_yaml)
+    if not isinstance(loaded, dict):
+        return {}
+    root = Path(repo_root).resolve()
+    files: dict[str, str] = {}
+    for agent in loaded.get("agents") or []:
+        if not isinstance(agent, dict):
+            continue
+        kwargs = agent.get("kwargs") or {}
+        if not isinstance(kwargs, dict):
+            continue
+        rel = str(kwargs.get("persona_path") or "").strip()
+        if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+            continue
+        path = (root / rel).resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            continue
+        if not path.is_file():
+            raise ModalHostJobError(
+                "persona file missing for Modal payload: {}".format(rel)
+            )
+        files[rel] = path.read_text(encoding="utf-8")
+    from backend.service.modal_docker_prebuild import harbor_environment_type
+
+    if harbor_environment_type(config_yaml) == "docker":
+        files[MODAL_HOST_NETWORK_COMPOSE_REL] = _host_network_compose_text(root)
+        runner = root / MODAL_OPENHANDS_RUNNER_REL
+        if runner.is_file():
+            files[MODAL_OPENHANDS_RUNNER_REL] = runner.read_text(encoding="utf-8")
+    return files
+
+
+def materialize_repo_files(root: str | Path, files: dict[str, str] | None) -> None:
+    repo = Path(root)
+    for rel, content in (files or {}).items():
+        text = str(rel or "").strip()
+        if not text or text.startswith("/") or ".." in Path(text).parts:
+            continue
+        dest = repo / text
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(str(content), encoding="utf-8")
+
+
 def prepare_modal_job_config(
     config_yaml: str,
     *,
@@ -327,7 +439,7 @@ def prepare_modal_job_config(
         return config_yaml
     loaded["job_name"] = job_name
     loaded["jobs_dir"] = jobs_dir or "jobs"
-    return yaml.safe_dump(loaded, sort_keys=False)
+    return attach_nested_docker_host_network(yaml.safe_dump(loaded, sort_keys=False))
 
 
 def modal_function_name_for_config(config_yaml: str) -> str:
@@ -374,6 +486,7 @@ def execute_host_harbor_job(
     try:
         prepare_docker_environment_for_job(config_yaml, repo_root=root)
     except DockerPrebuildError as exc:
+        print("docker prebuild failed: {}".format(exc), flush=True)
         return ModalHostJobResult(exit_code=1, error=str(exc))
     config_path = root / "configs" / "jobs" / "modal-host-incoming" / "{}.yaml".format(
         request.job_name
@@ -614,12 +727,17 @@ class LivePublishState:
         job_name: str,
         status_key: str = "",
         force: bool = False,
+        persist_volume: bool = True,
     ) -> bool:
         """Return True when the Modal Volume should ``commit()`` (artifact flush or Dict miss)."""
         status = collect_live_status(job_dir)
         wrote_dict = False
         if status_key:
             wrote_dict = put_live_status_dict(status_key, status)
+        if not persist_volume:
+            done_names = {name for name, state in status.items() if state in {"done", "error"}}
+            self.flushed_done.update(done_names)
+            return False
         status_changed = write_live_status_file(status, volume_root / job_name)
         done_names = {name for name, state in status.items() if state in {"done", "error"}}
         new_done = done_names - self.flushed_done
@@ -1056,21 +1174,38 @@ def materialize_modal_artifacts(
     dest.mkdir(parents=True, exist_ok=True)
     if result.artifact_tar:
         merge_job_artifacts(result.artifact_tar, jobs_dir=jobs_dir, job_name=job_name)
-    elif result.volume_path:
+    if result.volume_path and not job_dir_has_trials(dest):
         try:
             import modal
         except ImportError as exc:
+            if job_dir_has_trials(dest):
+                return dest
             raise ModalHostJobError(
                 "Modal wrote a volume path but the Modal SDK is not installed"
             ) from exc
-        volume = modal.Volume.from_name(
-            os.environ.get("MATRIX_MODAL_JOBS_VOLUME") or MODAL_JOBS_VOLUME_NAME
-        )
-        download_volume_job(volume, job_name=result.volume_path, dest=dest)
-    else:
-        raise ModalHostJobError(
-            "Modal finished without returning jobs/{}/ artifacts".format(job_name)
-        )
+        try:
+            volume = modal.Volume.from_name(
+                os.environ.get("MATRIX_MODAL_JOBS_VOLUME") or MODAL_JOBS_VOLUME_NAME
+            )
+            download_volume_job(
+                volume,
+                job_name=result.volume_path,
+                dest=dest,
+                incremental=job_dir_has_trials(dest),
+            )
+        except Exception as exc:  # noqa: BLE001
+            if not job_dir_has_trials(dest):
+                raise ModalHostJobError(
+                    "Modal finished without returning jobs/{}/ artifacts ({})".format(
+                        job_name, exc
+                    )
+                ) from exc
+    if not result.artifact_tar and not result.volume_path and not job_dir_has_trials(dest):
+        if result.exit_code == 0:
+            raise ModalHostJobError(
+                "Modal finished without returning jobs/{}/ artifacts".format(job_name)
+            )
+        return dest
     return dest
 
 
@@ -1079,6 +1214,34 @@ class SdkModalDispatchRunner:
 
     def spawn(self, request: ModalHostJobRequest) -> tuple[str, Any]:
         return self._runner(request).spawn(request)
+
+    def spawn_many(self, requests: list[ModalHostJobRequest]) -> list[tuple[str, Any]]:
+        if not requests:
+            return []
+        docker_idx = [
+            index
+            for index, request in enumerate(requests)
+            if modal_uses_docker_sandbox(request.config_yaml)
+        ]
+        if len(docker_idx) == len(requests):
+            from backend.service.modal_sandbox_job import SdkModalSandboxJobRunner
+
+            return SdkModalSandboxJobRunner().spawn_many(requests)
+        if not docker_idx:
+            runner = SdkModalHostJobRunner()
+            return [runner.spawn(request) for request in requests]
+        results: list[tuple[str, Any] | None] = [None] * len(requests)
+        docker_requests = [requests[index] for index in docker_idx]
+        from backend.service.modal_sandbox_job import SdkModalSandboxJobRunner
+
+        docker_spawned = SdkModalSandboxJobRunner().spawn_many(docker_requests)
+        for index, spawned in zip(docker_idx, docker_spawned):
+            results[index] = spawned
+        host_runner = SdkModalHostJobRunner()
+        for index, request in enumerate(requests):
+            if results[index] is None:
+                results[index] = host_runner.spawn(request)
+        return [item for item in results if item is not None]
 
     def wait(
         self,

@@ -66,6 +66,7 @@ def test_options_knob_values_match_allowed(config_manager):
     assert [o["value"] for o in knobs["personaModel"]["options"]] == PERSONA_MODEL_OPTIONS
     assert "anthropic/claude-opus-4-8" in PERSONA_MODEL_OPTIONS
     assert "dashscope/qwen3.7-max" in PERSONA_MODEL_OPTIONS
+    assert "dashscope/deepseek-v4.1-flash" in PERSONA_MODEL_OPTIONS
     assert "dashscope/deepseek-v4-pro" in PERSONA_MODEL_OPTIONS
     assert "openrouter/z-ai/glm-4.7" in PERSONA_MODEL_OPTIONS
     assert "openrouter/anthropic/claude-haiku-4.5" in PERSONA_MODEL_OPTIONS

@@ -421,6 +421,48 @@ def test_materialize_requires_artifacts(tmp_path: Path) -> None:
         )
 
 
+def test_materialize_allows_failed_empty_result(tmp_path: Path) -> None:
+    dest = materialize_modal_artifacts(
+        ModalHostJobResult(exit_code=1, error="sandbox empty"),
+        jobs_dir=tmp_path / "jobs",
+        job_name="missing",
+    )
+    assert dest == tmp_path / "jobs" / "missing"
+
+
+def test_materialize_keeps_existing_local_trials(tmp_path: Path) -> None:
+    dest = tmp_path / "jobs" / "demo"
+    trial = dest / "web__a"
+    trial.mkdir(parents=True)
+    (trial / "result.json").write_text("{}\n", encoding="utf-8")
+    (dest / "compute.json").write_text('{"family": "modal"}\n', encoding="utf-8")
+    merged = materialize_modal_artifacts(
+        ModalHostJobResult(exit_code=0),
+        jobs_dir=tmp_path / "jobs",
+        job_name="demo",
+    )
+    assert merged == dest
+    assert (dest / "web__a" / "result.json").is_file()
+
+
+def test_live_tick_skips_volume_when_persist_disabled(tmp_path: Path) -> None:
+    src = tmp_path / "src" / "j1"
+    trial = src / "web__a"
+    trial.mkdir(parents=True)
+    (trial / "result.json").write_text("{}\n", encoding="utf-8")
+    vol = tmp_path / "vol"
+    live = LivePublishState()
+    commit = live.tick(
+        src,
+        volume_root=vol,
+        job_name="j1",
+        status_key="j1",
+        persist_volume=False,
+    )
+    assert commit is False
+    assert not (vol / "j1").exists()
+
+
 def test_collect_orchestrator_secret_env_rewrites_loopback_chatbot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -442,6 +484,7 @@ def test_collect_orchestrator_secret_env_includes_provider_keys(
     for key, value in (
         ("XAI_API_KEY", "sk-xai"),
         ("DEEPSEEK_API_KEY", "sk-ds"),
+        ("DEEPSEEK_API_BASE", "https://api.deepseek.com"),
         ("ZAI_API_KEY", "sk-zai"),
         ("LLM_API_KEY", "sk-llm"),
         ("USE_COMPUTER_API_KEY", "sk-uc"),
@@ -451,7 +494,63 @@ def test_collect_orchestrator_secret_env_includes_provider_keys(
     env = collect_orchestrator_secret_env()
     assert env["XAI_API_KEY"] == "sk-xai"
     assert env["DEEPSEEK_API_KEY"] == "sk-ds"
+    assert env["DEEPSEEK_API_BASE"] == "https://api.deepseek.com"
     assert env["ZAI_API_KEY"] == "sk-zai"
     assert env["LLM_API_KEY"] == "sk-llm"
     assert env["USE_COMPUTER_API_KEY"] == "sk-uc"
     assert env["CLAUDE_API_KEY"] == "sk-claude"
+
+
+def test_attach_nested_docker_host_network_is_idempotent() -> None:
+    from backend.service.modal_host_job import (
+        MODAL_HOST_NETWORK_COMPOSE_REL,
+        attach_nested_docker_host_network,
+    )
+
+    first = attach_nested_docker_host_network("environment:\n  type: docker\n")
+    second = attach_nested_docker_host_network(first)
+    assert first.count(MODAL_HOST_NETWORK_COMPOSE_REL) == 1
+    assert second.count(MODAL_HOST_NETWORK_COMPOSE_REL) == 1
+    assert "network_mode" not in attach_nested_docker_host_network(
+        "environment:\n  type: host\n"
+    )
+
+
+def test_collect_local_repo_files_ships_host_network_overlay(tmp_path: Path) -> None:
+    from backend.service.modal_host_job import (
+        MODAL_HOST_NETWORK_COMPOSE_REL,
+        MODAL_OPENHANDS_RUNNER_REL,
+        collect_local_repo_files,
+    )
+
+    overlay = tmp_path / MODAL_HOST_NETWORK_COMPOSE_REL
+    overlay.parent.mkdir(parents=True)
+    overlay.write_text("services:\n  main:\n    network_mode: host\n", encoding="utf-8")
+    runner = tmp_path / MODAL_OPENHANDS_RUNNER_REL
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# patched runner\n", encoding="utf-8")
+    files = collect_local_repo_files("environment:\n  type: docker\n", tmp_path)
+    assert files[MODAL_HOST_NETWORK_COMPOSE_REL].endswith("network_mode: host\n")
+    assert files[MODAL_OPENHANDS_RUNNER_REL] == "# patched runner\n"
+
+
+def test_collect_and_materialize_persona_repo_files(tmp_path: Path) -> None:
+    from backend.service.modal_host_job import (
+        collect_local_repo_files,
+        materialize_repo_files,
+    )
+
+    rel = "persona/datasets/sample/persona_a.yaml"
+    src = tmp_path / rel
+    src.parent.mkdir(parents=True)
+    src.write_text("persona_id: a\n", encoding="utf-8")
+    config = (
+        "agents:\n"
+        "  - kwargs:\n"
+        "      persona_path: {}\n".format(rel)
+    )
+    files = collect_local_repo_files(config, tmp_path)
+    assert files[rel] == "persona_id: a\n"
+    dest = tmp_path / "remote"
+    materialize_repo_files(dest, files)
+    assert (dest / rel).read_text(encoding="utf-8") == "persona_id: a\n"

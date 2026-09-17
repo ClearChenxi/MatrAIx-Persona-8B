@@ -44,6 +44,7 @@ from harbor.environments.docker.compose_env import (
     merge_compose_env,
 )
 from harbor.environments.docker.docker import _sanitize_docker_image_name
+from harbor.environments.docker.host_network import build_host_network_overlay
 from harbor.environments.tar_transfer import (
     extract_dir_from_file,
     pack_dir_to_file,
@@ -283,62 +284,12 @@ class _ModalDinD(_ModalStrategy):
         use_prebuilt: bool = False,
         extra_compose_paths: list[Path] | None = None,
     ) -> str:
-        """Generate a compose overlay that sets host networking on all services.
-
-        Parses service names from the task's docker-compose.yaml and extra
-        compose overlays so the overlay covers all services regardless of naming
-        conventions.
-        Only adds ``build.network: host`` for services that have a build
-        context (not pure image-based services like redis).
-
-        Each service gets ``extra_hosts`` entries mapping every *other*
-        service name to ``127.0.0.1`` so that Docker DNS hostnames
-        (e.g. ``redis``, ``agent1``) resolve correctly under host networking.
-        """
-        import yaml
-
-        compose_path = environment_dir / "docker-compose.yaml"
-        services: dict[str, bool] = {}  # name -> has_build
-        compose_paths = [compose_path, *(extra_compose_paths or [])]
-        for path in compose_paths:
-            if not path.exists():
-                continue
-            doc = yaml.safe_load(path.read_text())
-            if doc and "services" in doc:
-                for name, cfg in doc["services"].items():
-                    has_build = isinstance(cfg, dict) and "build" in cfg
-                    services[name] = services.get(name, False) or has_build
-
-        # Fallback if parsing fails
-        if not services:
-            services = {"main": True, "sidecar": True, "redis": False}
-
-        # main always needs host networking.  In build mode it also needs
-        # build.network: host; in prebuilt mode only network_mode: host.
-        if use_prebuilt:
-            services.setdefault("main", False)
-        else:
-            services["main"] = True
-
-        service_names = list(services.keys())
-        lines = ["services:"]
-        for svc, has_build in services.items():
-            lines.append(f"  {svc}:")
-            if has_build:
-                lines.append("    build:")
-                lines.append("      network: host")
-            lines.append("    network_mode: host")
-            # Map all other service names to localhost so Docker DNS
-            # hostnames work under host networking.
-            others = [s for s in service_names if s != svc]
-            if others:
-                lines.append("    extra_hosts:")
-                for other in others:
-                    lines.append(f'      - "{other}:127.0.0.1"')
-            # NOTE: Do NOT add environment: here — it replaces (not merges)
-            # the service's entire environment block from the base compose
-            # file, wiping out AGENT_ID, API keys, etc.
-        return "\n".join(lines)
+        """Generate a compose overlay that sets host networking on all services."""
+        return build_host_network_overlay(
+            environment_dir,
+            use_prebuilt=use_prebuilt,
+            extra_compose_paths=extra_compose_paths,
+        )
 
     async def _vm_exec(
         self,
