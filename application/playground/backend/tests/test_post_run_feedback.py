@@ -173,3 +173,30 @@ def test_harbor_job_service_calls_post_run_feedback(tmp_path, monkeypatch):
 
     assert calls == [(repo, trial_dir)]
     service.shutdown()
+
+
+def test_harbor_job_service_scores_finished_trials_in_parallel(tmp_path, monkeypatch):
+    repo = tmp_path
+    job_dir = repo / "jobs" / "demo-job"
+    seen: list[str] = []
+    for name in ("trial-a", "trial-b", "trial-c"):
+        trial_dir = job_dir / name
+        trial_dir.mkdir(parents=True)
+        (trial_dir / "config.json").write_text("{}", encoding="utf-8")
+        (trial_dir / "result.json").write_text("{}", encoding="utf-8")
+    service = HarborJobService(
+        repo_root=repo,
+        jobs_dir=repo / "jobs",
+        generated_configs_dir=repo / "configs" / "jobs",
+    )
+    service._host_score_workers = 3
+    monkeypatch.setattr(
+        service,
+        "_score_finished_trial_on_host",
+        lambda trial_dir: seen.append(trial_dir.name),
+    )
+    already: set[str] = set()
+    service._score_new_finished_trials_on_host("demo-job", already_scored=already)
+    assert sorted(seen) == ["trial-a", "trial-b", "trial-c"]
+    assert already == {"trial-a", "trial-b", "trial-c"}
+    service.shutdown()

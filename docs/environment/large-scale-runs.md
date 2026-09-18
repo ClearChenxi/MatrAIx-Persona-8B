@@ -19,7 +19,7 @@ Pick one surface. They all write the same `jobs/<job_name>/` tree.
 
 A thousand-persona batch on this machine is the same generate + `matraix run -c`
 path as the [quickstart](../quickstart.md) (no `--compute-family`; default
-`local`). For Modal (or GKE) so the laptop can close:
+`local`). For Modal (or GKE):
 
 ```bash
 uv run python application/scripts/generate_application_job.py \
@@ -28,15 +28,18 @@ uv run python application/scripts/generate_application_job.py \
   --n-concurrent-trials 32 \
   --compute-family modal
 
-uv run matraix run -c configs/jobs/application-task-job-recipe/<generated>.yaml
+uv run --extra modal matraix run --compute-family modal \
+  -c configs/jobs/application-task-job-recipe/<generated>.yaml
 ```
 
 `--compute-family modal|gcp` on the generator records the family in the sidecar.
-`matraix run -c` then dispatches through HarborJobService (Modal Function /
-Sandbox or GKE workers + shards), same as Playground. Override with
-`matraix run -c <job.yaml> --compute-family local` to force this machine.
+`matraix run -c` then goes through HarborJobService (same as Playground).
+Override with `matraix run -c <job.yaml> --compute-family local` to force this
+machine.
 
 One launch covers the whole cohort. Do not start a separate job per persona.
+Give the job a **new** `job_name` if you re-run the same cohort — do not reuse
+an empty or failed `jobs/<name>/`.
 
 ### Compute family
 
@@ -49,48 +52,63 @@ export MATRIX_COMPUTE_FAMILY=modal   # remote; or gcp when daily concurrency sat
 
 Or pass `"computeFamily"` on `POST /api/harbor/jobs`. Omit it to stay `local`.
 
-| | Survey / chat | Web / Linux app | macOS / iOS app |
-|--|---------------|-----------------|-----------------|
-| `local` | This machine | Docker on this machine | use.computer |
-| `modal` | Modal | Modal | use.computer |
-| `gcp` | GKE | GKE | use.computer |
+| | Survey / chat | Web | Linux CUA / `force_docker` | macOS / iOS |
+|--|---------------|-----|----------------------------|-------------|
+| `local` | This machine | Docker on this machine | Docker on this machine | use.computer |
+| `modal` | Modal Function | Harbor `type: modal` (Direct) | Docker-in-sandbox worker | use.computer |
+| `gcp` | GKE host worker | Harbor `type: gke` | Harbor `type: gke` | use.computer |
 
 macOS / iOS always use use.computer, even when `computeFamily` is `modal` or
 `gcp`. Set `MATRIX_COMPUTE_FAMILY` or pass `computeFamily` on launch.
 
-**Modal** (`survey`, `chat`, `web`, Linux os-app): credentials on the API host
-and one deploy. Survey/chat run as a Function; web/Linux as a Sandbox with
-Docker. The first web/Linux job builds the task image; later jobs reuse it.
-Chat needs a sidecar URL that Modal can reach. Setup:
-[runtime.md](runtime.md).
+**Web on Modal (Direct).** This is the 1000-wide web path. Harbor on this
+machine is the orchestrator; each persona is a Modal Sandbox. The recipe
+writes `environment.type: modal` and **no** `dispatch`. One Harbor process
+owns the whole job so every trial shares one `Image.from_dockerfile` (first
+sandbox builds; the rest reuse). Keep `matraix run` up until Harbor and host
+self-report finish — closing the laptop stops the orchestrator. You need a
+Modal token on this machine (`modal setup`) and `uv run --extra modal`. You
+do **not** deploy `modal_host_app` for this path.
 
-Once you leave `local`, start remote batches on `modal`. Switch web/Linux to
-`gcp` first when daily concurrency stays high. Flip with
+Set Parallel / `--n-concurrent-trials` to the cohort size when you want all
+sandboxes in flight. Persist copies `/app/output` while the sandbox is still
+alive. If the task ships `input/self_report_schema.yaml`, HarborJobService
+writes `user_feedback.json` on the host after each trial (and again at
+job-end for anything the watcher missed). Leave interpreter and browser
+paths out of `instruction.md`; the shared Playwright image already has them.
+
+Smoke two personas on the **same** image and cohort before opening 1000.
+
+**Survey / chat on Modal.** Modal Function workers. Deploy
+`modal_host_app` once ([runtime.md](runtime.md)). The laptop can close after
+spawn; restart the API to reattach. Chat still needs a sidecar URL Modal can
+reach (`MATRIX_CHATBOT_PUBLIC_URL` or `MATRIX_CHATBOT_TUNNEL=auto`).
+
+**`force_docker` / Linux CUA on Modal.** Still a Playground Docker sandbox
+(`dispatch=modal_jobs`). That path is for CUA and explicit Docker, not the
+default web cohort.
+
+**GKE.** Web stays Harbor `type: gke` and **does** shard. Switch web here
+when daily Modal concurrency stays saturated:
 `MATRIX_COMPUTE_FAMILY=gcp` or `"computeFamily": "gcp"`.
 
 `nConcurrentTrials` (Playground **Parallel**) is how many trials run at once.
-Large Modal and GCP jobs split across workers automatically. Every trial still
-lands in `jobs/<job_name>/`. Survey/chat pack up to
-`MATRIX_HOST_PACK_CONCURRENCY` (default `32`) processes per worker; web/linux
-pack `MATRIX_WEB_PACK_CONCURRENCY` (default `1`) browser per worker.
-`MATRIX_SHARD_CONCURRENCY` (default `8`) is the max workers.
-`MATRIX_MAX_CONCURRENT_TRIALS` optionally caps Parallel.
-Survey/chat on Modal Functions and GKE host workers publish **status** every few
-seconds so the mosaic ticks; artifacts flush in batches (Modal) or when the
-pod packs the tree (GKE). Web/linux Modal Sandboxes publish the same overlay
-while the sandbox is up. All shards are spawned up front so closing the
-laptop does not cancel already-queued Modal / GKE work; restart the API to
-reattach.
+Survey/chat pack up to `MATRIX_HOST_PACK_CONCURRENCY` (default `32`)
+processes per Function / GKE host worker.
+`MATRIX_SHARD_CONCURRENCY` (default `8`) is the max GKE / survey-chat
+workers — it does not fan out Harbor `type: modal`.
+`MATRIX_WEB_PACK_CONCURRENCY` applies to GKE web / docker-in-sandbox
+workers, not Direct. `MATRIX_MAX_CONCURRENT_TRIALS` optionally caps Parallel.
 
-Chat on Modal/GKE needs a sidecar URL the worker can reach. Set a public
-endpoint, or `MATRIX_CHATBOT_PUBLIC_URL`, or `MATRIX_CHATBOT_TUNNEL=auto` so
-Playground can start cloudflared/ngrok, or use `computeFamily=local`.
+Survey/chat on Modal Functions and GKE host workers publish **status** every
+few seconds so the mosaic ticks; artifacts flush in batches (Modal) or when
+the pod packs the tree (GKE). Direct web writes `jobs/<job_name>/` on this
+machine as each sandbox finishes.
 
-Optional knobs: `MATRIX_HOST_PACK_CONCURRENCY`, `MATRIX_WEB_PACK_CONCURRENCY`,
-`MATRIX_SHARD_CONCURRENCY`, `MATRIX_MAX_CONCURRENT_TRIALS`,
-`MATRIX_MODAL_LIVE_PUSH_SEC`, `MATRIX_MODAL_LIVE_PULL_SEC`,
-`MATRIX_MODAL_ARTIFACT_FLUSH_TRIALS`, `MATRIX_MODAL_ARTIFACT_FLUSH_SEC`
-([runtime.md](runtime.md)).
+Optional knobs: `MATRIX_HOST_PACK_CONCURRENCY`, `MATRIX_SHARD_CONCURRENCY`,
+`MATRIX_MAX_CONCURRENT_TRIALS`, `MATRIX_MODAL_LIVE_PUSH_SEC`,
+`MATRIX_MODAL_LIVE_PULL_SEC`, `MATRIX_MODAL_ARTIFACT_FLUSH_TRIALS`,
+`MATRIX_MODAL_ARTIFACT_FLUSH_SEC` ([runtime.md](runtime.md)).
 
 ---
 
@@ -140,10 +158,15 @@ jobs/<job_name>/
 ├── result.json
 ├── <task>__<trial>/
 │   ├── agent/
+│   ├── artifacts/app/output/   # task JSON; user_feedback.json if the task has a schema
 │   ├── verifier/
 │   └── result.json
 └── job.log
 ```
+
+Harbor finishing  N/N  is not the same as host self-report finishing. Wait for
+`matraix run: status=completed` (or the Playground job to leave `running`)
+before treating `user_feedback.json` as missing.
 
 Keep `jobs/<job_name>/` and any sampled cohort directory if you need to
 reproduce the run. Pulled launch caches sit next to the source dataset, for

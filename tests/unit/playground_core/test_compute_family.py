@@ -37,10 +37,20 @@ def test_resolve_compute_plan_modal_family() -> None:
     )
     assert web.to_public_dict() == {
         "family": "modal",
+        "environment": "modal",
+    }
+    assert web.dispatch is None
+    assert web.harbor_environment() == {"type": "modal", "delete": True}
+    force_docker = resolve_compute_plan(
+        execution_mode="force_docker",
+        trial_profile="docker_agent",
+        compute_family="modal",
+    )
+    assert force_docker.to_public_dict() == {
+        "family": "modal",
         "environment": "docker",
         "dispatch": "modal_jobs",
     }
-    assert web.harbor_environment() == {"type": "docker", "delete": True}
 
 
 def test_packed_n_concurrent_trials_keeps_requested(
@@ -152,6 +162,9 @@ def test_needs_playground_dispatch() -> None:
     ).needs_playground_dispatch()
     assert ComputePlan(
         family="modal", environment="docker", dispatch="modal_jobs"
+    ).needs_playground_dispatch()
+    assert ComputePlan(
+        family="modal", environment="modal"
     ).needs_playground_dispatch()
     assert ComputePlan(family="gcp", environment="gke").needs_playground_dispatch()
     assert not ComputePlan(

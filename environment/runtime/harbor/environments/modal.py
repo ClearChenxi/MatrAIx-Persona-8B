@@ -5,6 +5,7 @@ import os
 import re
 import shlex
 import tempfile
+import time
 from abc import abstractmethod
 from pathlib import Path
 from typing import Any
@@ -68,6 +69,82 @@ except ImportError:
 
 _MODAL_DEFAULT_CPU_REQUEST_CORES = 0.125
 _MODAL_DEFAULT_MEMORY_REQUEST_MB = 128
+# Modal allows ~5 sandbox creates/s. Bursting past that at 1000-wide fan-in
+# just produces retries and wasted start time.
+_MODAL_SANDBOX_CREATE_RATE = 5.0
+_DIRECT_IMAGE_CACHE: dict[str, Any] = {}
+_DIRECT_IMAGE_LOCKS: dict[str, asyncio.Lock] = {}
+_DIRECT_IMAGE_META_LOCK = asyncio.Lock()
+_APP_CACHE: dict[str, Any] = {}
+_APP_LOCK: asyncio.Lock | None = None
+_CREATE_RATE_LOCK: asyncio.Lock | None = None
+_CREATE_RATE_NEXT = 0.0
+
+
+def _direct_image_cache_key(
+    *,
+    dockerfile_path: Path | None,
+    context_dir: Path | None,
+    image_name: str | None,
+    force_build: bool,
+) -> str:
+    """One key per task image, not per trial, so 1000 sandboxes share a build."""
+    if dockerfile_path is not None:
+        try:
+            resolved = str(dockerfile_path.resolve())
+        except OSError:
+            resolved = str(dockerfile_path)
+        stamp = ""
+        try:
+            stamp = str(dockerfile_path.stat().st_mtime_ns)
+        except OSError:
+            stamp = ""
+        context = ""
+        if context_dir is not None:
+            try:
+                context = str(context_dir.resolve())
+            except OSError:
+                context = str(context_dir)
+        return f"df:{resolved}:{stamp}:{context}:force={int(force_build)}"
+    return f"reg:{image_name or ''}"
+
+
+async def _direct_image_lock(key: str) -> asyncio.Lock:
+    async with _DIRECT_IMAGE_META_LOCK:
+        lock = _DIRECT_IMAGE_LOCKS.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            _DIRECT_IMAGE_LOCKS[key] = lock
+        return lock
+
+
+async def _lookup_modal_app(app_name: str):
+    """Reuse one Modal App handle per process instead of 1000 lookups."""
+    global _APP_LOCK
+    if _APP_LOCK is None:
+        _APP_LOCK = asyncio.Lock()
+    async with _APP_LOCK:
+        cached = _APP_CACHE.get(app_name)
+        if cached is not None:
+            return cached
+        app = await App.lookup.aio(name=app_name, create_if_missing=True)
+        _APP_CACHE[app_name] = app
+        return app
+
+
+async def _throttle_sandbox_create() -> None:
+    """Serialize sandbox creates to ~5/s in this Harbor process."""
+    global _CREATE_RATE_LOCK, _CREATE_RATE_NEXT
+    if _CREATE_RATE_LOCK is None:
+        _CREATE_RATE_LOCK = asyncio.Lock()
+    min_interval = 1.0 / _MODAL_SANDBOX_CREATE_RATE
+    async with _CREATE_RATE_LOCK:
+        now = time.monotonic()
+        wait_for = _CREATE_RATE_NEXT - now
+        if wait_for > 0:
+            await asyncio.sleep(wait_for)
+            now = time.monotonic()
+        _CREATE_RATE_NEXT = now + min_interval
 
 
 class _ModalStrategy:
@@ -187,30 +264,46 @@ class _ModalDirect(_ModalStrategy):
             docker_image=docker_image,
             force_build=force_build,
         )
-        if use_prebuilt and docker_image:
-            registry_secret = (
-                Secret.from_name(env._registry_secret) if env._registry_secret else None
-            )
-            if ".dkr.ecr." in docker_image:
-                env._image = Image.from_aws_ecr(
-                    docker_image,
-                    secret=registry_secret,
-                )
-            else:
-                env._image = Image.from_registry(
-                    docker_image,
-                    secret=registry_secret,
-                )
-        else:
-            env._image = Image.from_dockerfile(
-                env._environment_definition_path,
-                context_dir=env.environment_dir,
-            )
-
-        env._app = await App.lookup.aio(
-            name=env._app_name,
-            create_if_missing=True,
+        cache_key = _direct_image_cache_key(
+            dockerfile_path=(
+                None
+                if use_prebuilt and docker_image
+                else Path(env._environment_definition_path)
+            ),
+            context_dir=None if use_prebuilt and docker_image else env.environment_dir,
+            image_name=docker_image if use_prebuilt and docker_image else None,
+            force_build=force_build,
         )
+        lock = await _direct_image_lock(cache_key)
+        async with lock:
+            cached = _DIRECT_IMAGE_CACHE.get(cache_key)
+            if cached is not None:
+                env._image = cached
+            elif use_prebuilt and docker_image:
+                registry_secret = (
+                    Secret.from_name(env._registry_secret)
+                    if env._registry_secret
+                    else None
+                )
+                if ".dkr.ecr." in docker_image:
+                    env._image = Image.from_aws_ecr(
+                        docker_image,
+                        secret=registry_secret,
+                    )
+                else:
+                    env._image = Image.from_registry(
+                        docker_image,
+                        secret=registry_secret,
+                    )
+                _DIRECT_IMAGE_CACHE[cache_key] = env._image
+            else:
+                env._image = Image.from_dockerfile(
+                    env._environment_definition_path,
+                    context_dir=env.environment_dir,
+                )
+                _DIRECT_IMAGE_CACHE[cache_key] = env._image
+
+        env._app = await _lookup_modal_app(env._app_name)
 
         env._sandbox = await env._create_sandbox()
 
@@ -524,10 +617,7 @@ class _ModalDinD(_ModalStrategy):
             "> /etc/docker/daemon.json"
         )
 
-        env._app = await App.lookup.aio(
-            name=env._app_name,
-            create_if_missing=True,
-        )
+        env._app = await _lookup_modal_app(env._app_name)
 
         # DinD sandbox needs network for Docker daemon and image pulls
         env._sandbox = await env._create_sandbox(
@@ -1074,6 +1164,7 @@ class ModalEnvironment(ComposeServiceOpsMixin, BaseEnvironment):
         experimental_options: dict[str, Any] | None = None,
     ) -> Sandbox:
         """Create a sandbox with retry logic for transient failures."""
+        await _throttle_sandbox_create()
         if block_network is None:
             block_network = self._network_disabled
 
@@ -1242,6 +1333,11 @@ class ModalEnvironment(ComposeServiceOpsMixin, BaseEnvironment):
         # Creates parent directories locally if needed.
         await self._sandbox.filesystem.copy_to_local.aio(source_path, target_path)
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        reraise=True,
+    )
     async def _sdk_download_dir(self, source_dir: str, target_dir: Path | str) -> None:
         """
         Downloads a directory from the environment to the local machine. This overwrites
@@ -1281,6 +1377,11 @@ class ModalEnvironment(ComposeServiceOpsMixin, BaseEnvironment):
             with tempfile.TemporaryDirectory() as tmp_dir:
                 archive_path = Path(tmp_dir) / "download.tar.gz"
                 await self._sdk_download_file(remote_archive, archive_path)
+                if not archive_path.is_file() or archive_path.stat().st_size == 0:
+                    raise RuntimeError(
+                        f"Empty persist archive from {source_dir}; "
+                        "refusing to treat the trial as landed"
+                    )
                 extract_dir_from_file(archive_path, target_dir)
         finally:
             await self._sdk_exec(

@@ -236,7 +236,7 @@ def test_retry_failed_only_rediscovers_failed_shards(tmp_path, monkeypatch) -> N
     assert fake.calls[-1].config_yaml.count("persona_path:") == 2
 
 
-def test_launch_modal_family_web_writes_harbor_docker(tmp_path, monkeypatch) -> None:
+def test_launch_modal_family_web_writes_harbor_modal(tmp_path, monkeypatch) -> None:
     repo = tmp_path
     jobs_dir = repo / "jobs"
     jobs_dir.mkdir()
@@ -252,28 +252,22 @@ def test_launch_modal_family_web_writes_harbor_docker(tmp_path, monkeypatch) -> 
         encoding="utf-8",
     )
     monkeypatch.setattr("playground.harbor.playground._repo_root", lambda: repo)
+    harbor_calls: list[list[str]] = []
 
     class _FakeModalRunner:
         def __init__(self) -> None:
             self.calls: list[object] = []
 
         def run(self, request):
-            from backend.service.modal_host_job import ModalHostJobResult, pack_job_dir
-
             self.calls.append(request)
-            trial = jobs_dir / request.job_name / "web__trial"
-            trial.mkdir(parents=True)
-            (trial / "result.json").write_text("{}", encoding="utf-8")
-            return ModalHostJobResult(
-                exit_code=0, artifact_tar=pack_job_dir(jobs_dir / request.job_name)
-            )
+            raise AssertionError("web + modal must stay on local Harbor type=modal")
 
     fake = _FakeModalRunner()
     service = HarborJobService(
         repo_root=repo,
         jobs_dir=jobs_dir,
         generated_configs_dir=repo / "configs" / "jobs" / "application-task-job-recipe",
-        command_runner=lambda *args, **kwargs: 0,
+        command_runner=lambda command, **kwargs: harbor_calls.append(list(command)) or 0,
         harbor_command=("echo", "harbor"),
         modal_host_job_runner=fake,
     )
@@ -289,20 +283,21 @@ def test_launch_modal_family_web_writes_harbor_docker(tmp_path, monkeypatch) -> 
     service._executor.shutdown(wait=True)
     launch = service._launches[job_name]
     assert launch.compute_family == "modal"
-    assert launch.compute_environment == "docker"
-    assert launch.compute_dispatch == "modal_jobs"
-    assert fake.calls
+    assert launch.compute_environment == "modal"
+    assert launch.compute_dispatch is None
+    assert not fake.calls
+    assert harbor_calls
     config_text = (repo / "configs" / "jobs" / "application-task-job-recipe" / "modal-web.yaml").read_text(
         encoding="utf-8"
     )
-    assert "type: docker" in config_text
-    assert "dispatch=modal_jobs" in config_text
+    assert "type: modal" in config_text
+    assert "dispatch=modal_jobs" not in config_text
     compute = (jobs_dir / job_name / "compute.json").read_text(encoding="utf-8")
-    assert '"dispatch": "modal_jobs"' in compute
-    assert '"environment": "docker"' in compute
+    assert '"environment": "modal"' in compute
+    assert "modal_jobs" not in compute
 
 
-def test_launch_modal_family_web_fans_out_modal_jobs(tmp_path, monkeypatch) -> None:
+def test_launch_modal_family_web_stays_on_one_local_harbor(tmp_path, monkeypatch) -> None:
     repo = tmp_path
     jobs_dir = repo / "jobs"
     jobs_dir.mkdir()
@@ -323,28 +318,26 @@ def test_launch_modal_family_web_fans_out_modal_jobs(tmp_path, monkeypatch) -> N
     monkeypatch.setattr("playground.harbor.playground._repo_root", lambda: repo)
     monkeypatch.setenv("MATRIX_WEB_PACK_CONCURRENCY", "1")
     monkeypatch.setenv("MATRIX_SHARD_CONCURRENCY", "2")
+    harbor_calls: list[list[str]] = []
 
     class _FakeModalRunner:
         def __init__(self) -> None:
             self.calls: list[object] = []
 
         def run(self, request):
-            from backend.service.modal_host_job import ModalHostJobResult, pack_job_dir
-
             self.calls.append(request)
-            isolated = repo / "worker" / (request.shard_key or "s0") / request.job_name
-            trial = isolated / "web__{}".format(request.shard_key or "s0")
-            trial.mkdir(parents=True)
-            (trial / "result.json").write_text("{}\n", encoding="utf-8")
-            (isolated / "result.json").write_text('{"shard": true}\n', encoding="utf-8")
-            return ModalHostJobResult(exit_code=0, artifact_tar=pack_job_dir(isolated))
+            raise AssertionError("web + modal must not fan out Playground sandboxes")
+
+        def spawn_many(self, requests):
+            self.calls.extend(requests)
+            raise AssertionError("web + modal must not spawn Playground sandboxes")
 
     fake = _FakeModalRunner()
     service = HarborJobService(
         repo_root=repo,
         jobs_dir=jobs_dir,
         generated_configs_dir=repo / "configs" / "jobs" / "application-task-job-recipe",
-        command_runner=lambda *args, **kwargs: 0,
+        command_runner=lambda command, **kwargs: harbor_calls.append(list(command)) or 0,
         harbor_command=("echo", "harbor"),
         modal_host_job_runner=fake,
     )
@@ -355,29 +348,28 @@ def test_launch_modal_family_web_fans_out_modal_jobs(tmp_path, monkeypatch) -> N
         agent_name="persona-computer-1",
         job_name="modal-web-shards",
         compute_family="modal",
+        n_concurrent_trials=4,
         execution_plane="harbor",
     )
     service._executor.shutdown(wait=True)
     launch = service._launches[job_name]
     assert launch.status == "completed"
-    assert launch.compute_environment == "docker"
-    assert launch.compute_dispatch == "modal_jobs"
-    assert len(fake.calls) == 2
+    assert launch.compute_environment == "modal"
+    assert launch.compute_dispatch is None
+    assert not fake.calls
+    assert len(harbor_calls) == 1
     job_dir = jobs_dir / job_name
     assert (job_dir / "compute.json").is_file()
-    assert (job_dir / "web__s0" / "result.json").is_file()
-    assert (job_dir / "web__s1" / "result.json").is_file()
-    rolled = json.loads((job_dir / "result.json").read_text(encoding="utf-8"))
-    assert rolled["n_total_trials"] == 4
-    assert rolled.get("finished_at")
-    shard0 = (
-        repo / "configs" / "jobs" / "application-task-job-recipe" / "modal-web-shards.shard-00.yaml"
+    assert not (repo / "configs" / "jobs" / "application-task-job-recipe" / "modal-web-shards.shard-00.yaml").is_file()
+    config_text = (
+        repo / "configs" / "jobs" / "application-task-job-recipe" / "modal-web-shards.yaml"
     ).read_text(encoding="utf-8")
-    assert "type: docker" in shard0
-    assert "job_name: modal-web-shards" in shard0
+    assert "type: modal" in config_text
+    assert "n_concurrent_trials: 4" in config_text
+    assert "job_name: modal-web-shards" in config_text
 
 
-def test_launch_modal_web_spawn_many_merges_local_jobs(tmp_path, monkeypatch) -> None:
+def test_launch_modal_web_does_not_spawn_playground_sandboxes(tmp_path, monkeypatch) -> None:
     repo = tmp_path
     jobs_dir = repo / "jobs"
     jobs_dir.mkdir()
@@ -398,44 +390,25 @@ def test_launch_modal_web_spawn_many_merges_local_jobs(tmp_path, monkeypatch) ->
     monkeypatch.setattr("playground.harbor.playground._repo_root", lambda: repo)
     monkeypatch.setenv("MATRIX_WEB_PACK_CONCURRENCY", "1")
     monkeypatch.setenv("MATRIX_SHARD_CONCURRENCY", "2")
+    harbor_calls: list[list[str]] = []
 
     class _FakeModalRunner:
         def __init__(self) -> None:
             self.spawn_batches: list[int] = []
-            self.calls: list[object] = []
 
         def spawn_many(self, requests):
             self.spawn_batches.append(len(requests))
-            spawned = []
-            for request in requests:
-                self.calls.append(request)
-                spawned.append(("sandbox:{}".format(request.shard_key), object()))
-            return spawned
+            raise AssertionError("web + modal must not spawn Playground sandboxes")
 
         def spawn(self, request):
             return self.spawn_many([request])[0]
-
-        def wait(self, request, **kwargs):
-            from backend.service.modal_host_job import ModalHostJobResult, pack_job_dir
-
-            del kwargs
-            isolated = repo / "worker" / (request.shard_key or "s0") / request.job_name
-            trial = isolated / "web__{}".format(request.shard_key or "s0")
-            trial.mkdir(parents=True)
-            (trial / "result.json").write_text("{}\n", encoding="utf-8")
-            dest = jobs_dir / request.job_name
-            dest.mkdir(parents=True, exist_ok=True)
-            trial_dir = dest / trial.name
-            trial_dir.mkdir(parents=True, exist_ok=True)
-            (trial_dir / "result.json").write_text("{}\n", encoding="utf-8")
-            return ModalHostJobResult(exit_code=0, artifact_tar=pack_job_dir(isolated))
 
     fake = _FakeModalRunner()
     service = HarborJobService(
         repo_root=repo,
         jobs_dir=jobs_dir,
         generated_configs_dir=repo / "configs" / "jobs" / "application-task-job-recipe",
-        command_runner=lambda *args, **kwargs: 0,
+        command_runner=lambda command, **kwargs: harbor_calls.append(list(command)) or 0,
         harbor_command=("echo", "harbor"),
         modal_host_job_runner=fake,
     )
@@ -449,12 +422,11 @@ def test_launch_modal_web_spawn_many_merges_local_jobs(tmp_path, monkeypatch) ->
         execution_plane="harbor",
     )
     service._executor.shutdown(wait=True)
-    assert fake.spawn_batches == [2]
+    assert fake.spawn_batches == []
+    assert len(harbor_calls) == 1
     record = service._launches[job_name]
     assert record.status == "completed", record.error
-    job_dir = jobs_dir / job_name
-    assert (job_dir / "web__s0" / "result.json").is_file()
-    assert (job_dir / "web__s1" / "result.json").is_file()
+    assert record.compute_environment == "modal"
 
 
 def test_spawn_and_wait_respawns_failed_cloud_run_shards(tmp_path) -> None:

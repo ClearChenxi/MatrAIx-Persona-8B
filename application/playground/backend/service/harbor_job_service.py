@@ -672,6 +672,7 @@ class HarborJobService:
     # Poll interval for per-trial host scoring while Harbor is still running.
     _host_score_poll_sec: float = 2.0
     _host_score_join_timeout_sec: float = 600.0
+    _host_score_workers: int | None = None
 
     @classmethod
     def from_repo(cls, *, repo_root: Path | None = None, jobs_dir: Path | None = None) -> "HarborJobService":
@@ -2476,16 +2477,54 @@ class HarborJobService:
         except Exception:
             logger.exception("post_run_feedback failed for trial %s", trial_dir)
 
+    def _host_score_pool_size(self, n: int) -> int:
+        from backend.service.cohort_shard_planner import host_pack_concurrency_from_env
+
+        configured = self._host_score_workers
+        if configured is None:
+            configured = host_pack_concurrency_from_env()
+        return max(1, min(int(configured), max(1, int(n))))
+
+    def _map_host_score_trials(
+        self,
+        trial_dirs: list[Path],
+        worker: Callable[[Path], None],
+        *,
+        label: str,
+    ) -> None:
+        if not trial_dirs:
+            return
+        workers = self._host_score_pool_size(len(trial_dirs))
+        if workers == 1 or len(trial_dirs) == 1:
+            for trial_dir in trial_dirs:
+                worker(trial_dir)
+            return
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(worker, trial_dir): trial_dir for trial_dir in trial_dirs}
+            for future in as_completed(futures):
+                trial_dir = futures[future]
+                try:
+                    future.result()
+                except Exception:
+                    logger.exception("%s failed for trial %s", label, trial_dir)
+
     def _score_new_finished_trials_on_host(
         self, job_name: str, *, already_scored: set[str]
     ) -> None:
         """Score trials that have ``result.json`` and have not been attempted yet."""
+        pending: list[Path] = []
         for trial_dir in self._iter_scorable_trial_dirs(job_name):
             if trial_dir.name in already_scored:
                 continue
             if not (trial_dir / "result.json").is_file():
                 continue
-            self._score_finished_trial_on_host(trial_dir)
+            pending.append(trial_dir)
+        self._map_host_score_trials(
+            pending,
+            self._score_finished_trial_on_host,
+            label="host scoring",
+        )
+        for trial_dir in pending:
             already_scored.add(trial_dir.name)
 
     def _watch_and_score_trials_on_host(
@@ -2523,12 +2562,17 @@ class HarborJobService:
         """Job-end rescue: host-score any trial still missing a reward."""
         from playground.host_verifier import maybe_run_host_verifier
 
-        for trial_dir in self._iter_scorable_trial_dirs(job_name):
+        def _one(trial_dir: Path) -> None:
             try:
                 maybe_run_host_verifier(repo_root=self.repo_root, trial_dir=trial_dir)
             except Exception:
                 logger.exception("host_verifier rescue failed for trial %s", trial_dir)
-                continue
+
+        self._map_host_score_trials(
+            self._iter_scorable_trial_dirs(job_name),
+            _one,
+            label="host_verifier rescue",
+        )
 
     def _maybe_generate_post_run_feedback(self, job_name: str) -> None:
         """Job-end rescue: write user_feedback for trials still missing it."""
@@ -2536,12 +2580,17 @@ class HarborJobService:
             maybe_write_trial_user_feedback,
         )
 
-        for trial_dir in self._iter_scorable_trial_dirs(job_name):
+        def _one(trial_dir: Path) -> None:
             try:
                 maybe_write_trial_user_feedback(repo_root=self.repo_root, trial_dir=trial_dir)
             except Exception:
                 logger.exception("post_run_feedback rescue failed for trial %s", trial_dir)
-                continue
+
+        self._map_host_score_trials(
+            self._iter_scorable_trial_dirs(job_name),
+            _one,
+            label="post_run_feedback rescue",
+        )
 
     def get_trial_events(
         self,

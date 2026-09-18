@@ -311,10 +311,12 @@ uv run python application/scripts/generate_application_job.py \
 
 The script outputs a YAML recipe and a `matraix run -c` command. Pass
 `--n-concurrent-trials` (default 2, same as the UI Parallel control). Omit
-`--compute-family` to stay `local`. Pass `modal` or `gcp` only when trials
-should run remotely; the sidecar records that family.
+`--compute-family` to stay `local`. Pass `modal` or `gcp` when trials should
+leave local Docker; the sidecar records that family.
 `matraix run` is the only executor: local wraps `harbor run`; modal/gcp
-use HarborJobService (same path as Playground). The recipe pins
+use HarborJobService (same path as Playground). Web + `modal` is Harbor
+`type: modal` on this machine (Direct sandboxes + host self-report).
+Survey/chat + `modal` are Modal Functions. The recipe pins
 `agents[].model_name` so you can edit it or pass `--model-name` on regenerate.
 
 Generated recipes land under `configs/jobs/application-task-job-recipe/` (see [Recipe directories](#recipe-directories) above).

@@ -183,11 +183,12 @@ Request body:
 
 `computeFamily` is optional (`local`, `modal`, or `gcp`; default
 `MATRIX_COMPUTE_FAMILY` or `local`). Omit it on the API and omit
-`--compute-family` on generate to stay on this machine. For remote trials,
+`--compute-family` on generate to stay on this machine. For Modal or GKE,
 `generate_application_job.py --compute-family modal` (or `gcp`) then
-`matraix run -c`. Each job writes
-`jobs/<job_name>/compute.json`. macOS/iOS CUA stays `use-computer`
-(`cuaPinned`) even when the family is `modal`/`gcp`. See
+`matraix run -c`. Web + `modal` writes `environment.type: modal` (Direct;
+Harbor stays on this machine). Survey/chat + `modal` dispatch to Functions.
+Each job writes `jobs/<job_name>/compute.json`. macOS/iOS CUA stays
+`use-computer` (`cuaPinned`) even when the family is `modal`/`gcp`. See
 [large-scale-runs.md](../environment/large-scale-runs.md) and
 [runtime.md](../environment/runtime.md).
 

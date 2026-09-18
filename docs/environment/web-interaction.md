@@ -9,7 +9,7 @@ default.
 
 | Mode | Task example | Agent | Environment | When to use |
 |------|----------------|-------|-------------|-------------|
-| **Playwright** | `application/tasks/example-web-playwright_quote-choice/` | `persona-openhands-sdk` | `docker` + `network_mode = "public"` | Terminal + Python Playwright; CI-friendly, lower cost |
+| **Playwright** | `application/tasks/example-web-playwright_quote-choice/` | `persona-openhands-sdk` | local: `docker`; `computeFamily=modal`: Harbor `type: modal` (same image) | Terminal + Python Playwright; CI-friendly, lower cost |
 | **browser-use** | `application/tasks/example-web-browser-use_laptop-choice/` | `persona-browser-use` | `docker` + `network_mode = "public"` | Dedicated browser agent loop; persona via `extend_system_message` |
 | **Cocoa** | `application/tasks/example-web-cocoa_plan-choice/` | `persona-cocoa` | `docker` + AIO Sandbox image + `network_mode = "public"` | Unified browser + shell + files in one container |
 | **CUA** | `application/tasks/example-web-cua_bookshop-choice/` | `persona-computer-1` | `docker` (Linux Xvfb) | Screenshot loop in Linux desktop; finish with **done** action |
@@ -56,7 +56,8 @@ Full metric contract: [task-spec/web/README.md](../../application/task-spec/web/
 
 **How it works:** Chromium is controlled through the **Playwright API** (DOM
 selectors). The agent (via OpenHands terminal) runs Python that calls
-`page.goto()`, `locator()`, etc.
+`page.goto()`, `locator()`, etc. The shared Playwright image already exposes
+`playwright` on the agent interpreters — keep `instruction.md` task-only.
 
 **Pros:** Faster, cheaper, more repeatable than CUA; JavaScript-rendered pages work.
 

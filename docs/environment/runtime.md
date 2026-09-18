@@ -75,9 +75,13 @@ export MATRIX_COMPUTE_FAMILY=modal
 export MATRIX_EXECUTION_PLANE=harbor
 ```
 
-That one deploy covers survey, chat, web, and Linux. Survey and chat run as a
-Modal Function. Web and Linux run as a Sandbox with Docker. The first web/Linux
-job builds the shared task image; later jobs reuse it.
+That deploy covers **survey/chat** (Modal Function) and **`force_docker` /
+Linux CUA** (Docker-in-sandbox). Default **web** on `computeFamily=modal`
+does not use it: Harbor `type: modal` creates sandboxes from this machine
+(Direct). Modal credentials + `uv run --extra modal` are enough; keep
+`matraix run` running. The first Direct sandbox builds the Playwright
+image; later sandboxes in the same process reuse it. See
+[large-scale-runs.md](large-scale-runs.md).
 
 Chat tasks need a sidecar URL reachable from Modal (`CHATBOT_API_URL` or the
 task’s upstream env). Production uses a public (or VPC) endpoint.
@@ -99,22 +103,24 @@ trial trees flush every `MATRIX_MODAL_ARTIFACT_FLUSH_TRIALS` completions
 `volume.commit()`. The API overlays that status onto local `jobs/<job_name>/`
 so the mosaic ticks without re-downloading logs.
 
-Web/linux **Modal Sandboxes** publish the same mosaic overlay while the sandbox
-is up (`/tmp/matraix-live.json`, plus the jobs volume). Task images persist on
-`matraix-docker-images` so later jobs skip `compose build`.
+Web **Direct** (`type: modal`) writes `jobs/<job_name>/` from this Harbor
+process; there is no jobs-volume overlay and no Harbor shard fan-out.
+`force_docker` / Linux CUA Modal workers still publish the mosaic overlay
+while the sandbox is up (`/tmp/matraix-live.json`).
 
 GKE host workers (`dispatch=gke_workers`) do the same overlay from
 `/tmp/matraix-live.json` about every `MATRIX_GKE_LIVE_PUSH_SEC` seconds
 (default `5`) while the pod is running.
 
-Closing the laptop does **not** stop shards already spawned on Modal (or GKE
-Jobs already created). Launch writes `jobs/<job>/_generated/cloud_run.json`
-with worker ids **after each spawn**, then waits. Restart the Playground API
-on the same checkout/`jobs/` to reattach and pull artifacts. Shards that were
-never spawned (killed during the brief spawn loop) will not run until you
-retry. The live mosaic is gone while the API is down; it catches up on resume.
-Survey, chat, web, and Linux all use this path when `computeFamily` is `modal`
-or `gcp`.
+Closing the laptop does **not** stop survey/chat Functions or GKE Jobs already
+spawned. Launch writes `jobs/<job>/_generated/cloud_run.json` with worker ids
+**after each spawn**, then waits. Restart the Playground API on the same
+checkout/`jobs/` to reattach and pull artifacts. Shards that were never
+spawned (killed during the brief spawn loop) will not run until you retry.
+
+Web Direct is the opposite: this machine *is* the Harbor orchestrator. Stop
+`matraix run` and in-flight sandboxes are abandoned. Do not fan the job
+across Harbor shards.
 
 macOS / iOS computer-use always stays on use.computer, even when
 `MATRIX_COMPUTE_FAMILY` is `modal` or `gcp`. Set the family with
@@ -171,11 +177,12 @@ export MATRIX_COMPUTE_FAMILY=gcp
 Per-request override still wins: a survey can stay `"computeFamily": "modal"`
 while a web job uses `"gcp"`.
 
-`MATRIX_SHARD_CONCURRENCY` (default 8) is the max Modal/GKE workers for one
-job. `MATRIX_HOST_PACK_CONCURRENCY` (default 32) is the max survey/chat
-processes packed onto one of those workers. Playground Parallel is the
-global in-flight cap; the planner fills pack first, then adds workers.
-Results still write to one `jobs/<job_name>/`. See
+`MATRIX_SHARD_CONCURRENCY` (default 8) is the max survey/chat Modal workers
+or GKE Harbor processes for one job. It does not split Harbor `type: modal`.
+`MATRIX_HOST_PACK_CONCURRENCY` (default 32) is the max survey/chat processes
+packed onto one of those workers, and also the host self-report / verifier
+pool after Direct web trials. Playground Parallel is the global in-flight
+cap. Results still write to one `jobs/<job_name>/`. See
 [large-scale-runs.md](large-scale-runs.md).
 
 ## Option A: Local Matraix Playground (default)
@@ -247,7 +254,7 @@ Optional dev-only `taskType=web` returns a deterministic mock when
 | `MATRIX_COMPUTE_FAMILY` | Default `local`. Set `modal` or `gcp` for remote trials |
 | `MATRIX_SHARD_CONCURRENCY` | Max workers for one job (default `8`) |
 | `MATRIX_HOST_PACK_CONCURRENCY` | Max survey/chat processes per Modal / GKE host worker (default `32`; does not override Playground Parallel) |
-| `MATRIX_WEB_PACK_CONCURRENCY` | Max browsers per Modal / GKE web worker (default `1`) |
+| `MATRIX_WEB_PACK_CONCURRENCY` | Max browsers per GKE / docker-in-sandbox web worker (default `1`; unused on Harbor `type: modal`) |
 | `MATRIX_MAX_CONCURRENT_TRIALS` | Optional cap on Playground Parallel |
 | `MATRIX_MODAL_LIVE_PUSH_SEC` | Modal survey/chat status tick (Dict / `live_status.json`, default `5`) |
 | `MATRIX_MODAL_LIVE_PULL_SEC` | How often the API reads that status into local `jobs/<job>/` (default `5`) |

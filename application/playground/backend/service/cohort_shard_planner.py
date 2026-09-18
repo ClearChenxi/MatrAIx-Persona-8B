@@ -375,9 +375,14 @@ def should_fanout_harbor_shards(
     dispatch: str | None,
     shard_count: int,
 ) -> bool:
-    """Split web/linux Harbor processes on Modal/GKE when Parallel needs more workers."""
+    """Split GKE Harbor processes when Parallel needs more workers.
+
+    Harbor ``type: modal`` stays on one local process so 1000 sandboxes
+    share one Image.from_dockerfile and one 5/s create limiter.
+    """
     if shard_count <= 1 or dispatch:
         return False
     if (family or "").strip().lower() not in {"modal", "gcp"}:
         return False
-    return (environment or "").strip().lower() in {"modal", "gke"}
+    # Harbor type=modal Direct: one local process, many sandboxes, one Image.
+    return (environment or "").strip().lower() == "gke"

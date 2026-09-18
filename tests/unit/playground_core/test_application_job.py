@@ -166,6 +166,11 @@ def test_resolve_job_environment_compute_family(monkeypatch: pytest.MonkeyPatch)
         execution_mode="auto",
         trial_profile="docker_agent",
         compute_family="modal",
+    ) == {"type": "modal", "delete": True}
+    assert resolve_job_environment(
+        execution_mode="force_docker",
+        trial_profile="docker_agent",
+        compute_family="modal",
     ) == {"type": "docker", "delete": True}
     assert resolve_job_environment(
         execution_mode="auto",

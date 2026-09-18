@@ -55,7 +55,7 @@ def test_plan_job_config_shards_keeps_job_name():
     assert should_fanout_cloud_shards("modal_jobs", 2)
     assert not should_fanout_cloud_shards("modal_jobs", 1)
     assert not should_fanout_cloud_shards(None, 5)
-    assert should_fanout_harbor_shards(
+    assert not should_fanout_harbor_shards(
         family="modal", environment="modal", dispatch=None, shard_count=2
     )
     assert should_fanout_harbor_shards(

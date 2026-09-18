@@ -67,12 +67,13 @@ Remote plane details: [unified-runtime.md](runtime.md).
 | Family | Meaning | Configure |
 |--------|---------|-----------|
 | `local` (default) | Trials on the Harbor orchestrator | `MATRIX_COMPUTE_FAMILY=local` |
-| `modal` | Survey, chat, web, Linux on Modal | `MATRIX_COMPUTE_FAMILY=modal` + Modal deploy |
+| `modal` | Survey/chat = Function; web = Harbor `type: modal` Direct | `MATRIX_COMPUTE_FAMILY=modal` + Modal token (`modal_host_app` deploy only for survey/chat / `force_docker`) |
 | `gcp` | Survey, chat, web, Linux on GKE | `MATRIX_COMPUTE_FAMILY=gcp` + cluster + host image |
 
-Default is `local`. Set `modal` / `gcp` only for remote trials. If you already
-run on Modal, switch web to GKE when daily concurrency saturates. See
-[runtime.md](runtime.md).
+Default is `local`. Set `modal` / `gcp` only when trials should leave this
+machine's Docker. Web on Modal keeps Harbor on this laptop. Switch web to
+GKE when daily Modal concurrency saturates. See
+[large-scale-runs.md](large-scale-runs.md) and [runtime.md](runtime.md).
 
 **Security note:** the remote plane sends only `PYTHONPATH` and `MATRIX_*` task exports over HTTP. API keys must live on the **worker**, not in the dispatch payload.
 
@@ -112,9 +113,9 @@ Python import names stay stable: `harbor.*`, `matraix.agents.*`, `playground.*`.
 |----------|---------|
 | `MATRIX_EXECUTION_PLANE` | `harbor` (default) or `remote` |
 | `MATRIX_COMPUTE_FAMILY` | `local` (default), `modal`, or `gcp` |
-| `MATRIX_SHARD_CONCURRENCY` | Max workers for one job (default `8`) |
-| `MATRIX_HOST_PACK_CONCURRENCY` | Max survey/chat processes per Modal / GKE host worker (default `32`; does not override Playground Parallel) |
-| `MATRIX_WEB_PACK_CONCURRENCY` | Max browsers per Modal / GKE web worker (default `1`) |
+| `MATRIX_SHARD_CONCURRENCY` | Max survey/chat or GKE workers for one job (default `8`; unused on Harbor `type: modal`) |
+| `MATRIX_HOST_PACK_CONCURRENCY` | Max survey/chat processes per Function / GKE host worker, and host self-report pool (default `32`; does not override Playground Parallel) |
+| `MATRIX_WEB_PACK_CONCURRENCY` | Max browsers per GKE / docker-in-sandbox web worker (default `1`; unused on Harbor `type: modal`) |
 | `MATRIX_MAX_CONCURRENT_TRIALS` | Optional cap on Playground Parallel |
 | `MATRIX_GKE_CLUSTER` / `MATRIX_GKE_REGION` / `MATRIX_GKE_REGISTRY` | GKE cluster for `computeFamily=gcp` |
 | `MATRIX_GKE_HOST_IMAGE` | Image for survey/chat GKE host workers |

@@ -1,9 +1,11 @@
 """Resolve Playground compute family to a Harbor environment (+ optional dispatch).
 
 Users set ``computeFamily`` / ``MATRIX_COMPUTE_FAMILY`` (``local`` | ``modal`` | ``gcp``).
-Harbor still receives a normal ``environment.type``. When the family is ``modal``
-or ``gcp``, Playground starts the workers: Modal Functions for survey/chat,
-Modal Sandboxes for web/linux, or GKE Jobs.
+Harbor still receives a normal ``environment.type``. Survey/chat on ``modal``
+use Modal Functions (Playground dispatch). Web/linux on ``modal`` use Harbor
+``type: modal`` on this machine (one Playwright image, many sandboxes).
+``force_docker`` and linux CUA still go through Playground Docker sandboxes.
+GKE web stays ``type: gke``.
 """
 
 from __future__ import annotations
@@ -57,7 +59,10 @@ class ComputePlan:
     def needs_playground_dispatch(self) -> bool:
         """True when ``matraix run`` must go through HarborJobService.
 
-        Modal Functions / Sandboxes and GKE Jobs are Playground dispatch.
+        Modal Functions, Playground Docker sandboxes, GKE Jobs, and Harbor
+        ``type: modal`` go through HarborJobService. For ``type: modal`` that
+        is still a local ``harbor run`` (Direct sandboxes); the service is
+        what writes post-run self-report / host verifier onto ``jobs/``.
         CUA stays on this machine even if the family is modal/gcp.
         """
         if self.cua_pinned:
@@ -133,7 +138,9 @@ def resolve_compute_plan(
     if family == "modal":
         if native and mode != "force_docker":
             return ComputePlan(family=family, environment="host", dispatch="modal_jobs")
-        return ComputePlan(family=family, environment="docker", dispatch="modal_jobs")
+        if mode == "force_docker" or (cua_env is not None and cua_env[0] == "docker"):
+            return ComputePlan(family=family, environment="docker", dispatch="modal_jobs")
+        return ComputePlan(family=family, environment="modal")
 
     if family == "gcp":
         if native and mode != "force_docker":

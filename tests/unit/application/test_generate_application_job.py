@@ -70,3 +70,15 @@ def test_format_run_instructions_modal_uses_matraix_run() -> None:
     assert "--launch" not in joined
     assert "sidecar computeFamily=modal" in joined
     assert "generate_application_job.py" not in joined
+
+
+def test_format_run_instructions_modal_web_stays_on_local_harbor() -> None:
+    lines = gen.format_run_instructions(
+        config_display="configs/jobs/application-task-job-recipe/job.yaml",
+        compute_plan=ComputePlan(family="modal", environment="modal"),
+        n_concurrent_trials=1000,
+    )
+    joined = "\n".join(lines)
+    assert "uv run matraix run -c configs/jobs/application-task-job-recipe/job.yaml" in joined
+    assert "sidecar computeFamily=modal" in joined
+    assert "n_concurrent_trials=1000" in joined

@@ -1,7 +1,9 @@
 """Dispatch ``matraix run -c`` through Harbor or HarborJobService.
 
-Local Harbor recipes stay on ``harbor run``. Modal / GKE recipes use the same
-``HarborJobService.launch`` path as Playground / ``POST /api/harbor/jobs``.
+Local Harbor recipes stay on ``harbor run``. Modal / GKE recipes use the
+same ``HarborJobService.launch`` path as Playground / ``POST /api/harbor/jobs``.
+Harbor ``type: modal`` still runs locally inside that service so host
+self-report and verifier land on ``jobs/``.
 """
 
 from __future__ import annotations

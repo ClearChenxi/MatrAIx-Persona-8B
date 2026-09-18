@@ -53,8 +53,9 @@ def resolve_job_environment(
 
     ``compute_family`` (``local`` / ``modal`` / ``gcp``) selects the provider.
     Survey/chat on ``modal`` keep Harbor ``type: host`` (Modal Function).
-    Web/linux on ``modal`` keep Harbor ``type: docker`` and run in a Sandbox
-    (task images cached on a Volume). CUA macOS/iOS still pins ``use-computer``.
+    Web/linux on ``modal`` use Harbor ``type: modal`` (Direct sandbox = task
+    image, local persist). ``force_docker`` still uses a Playground Docker
+    sandbox. CUA macOS/iOS still pins ``use-computer``.
     """
     return resolve_compute_plan(
         execution_mode=execution_mode,
