@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0",
+  "recorded_on": "2026-10-10",
+  "files": [
+    {
+      "path_relative_to_research_root": "thesis-experiment-blueprint/README.md",
+      "bytes": 25073,
+      "sha256": "3e9b6d637f68417a03252f31d85d0a7db0f2e90ced2cf12391368a1db41b9d44"
+    },
+    {
+      "path_relative_to_research_root": "thesis-experiment-blueprint/实验执行手册.md",
+      "bytes": 50059,
+      "sha256": "7173e392cceea2f7a85b40e696a042244965548ddd004baade79d2ba9ce896c9"
+    },
+    {
+      "path_relative_to_research_root": "thesis-experiment-blueprint/REVIEW_FIXES.md",
+      "bytes": 9046,
+      "sha256": "4f5f43ecf56deac86f0a800b2320dbe3c9b21b59ad7bd458e719a7760445983e"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/README.md",
+      "bytes": 1533,
+      "sha256": "03531691324912c8fb9d38d014df61bf2ecf6c3a6f4f0f1bb3e60146ad70b540"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/RESEARCH_QUESTION.md",
+      "bytes": 617,
+      "sha256": "285c21c7c64bdde3005c377e435b2ecb887d4042fff6ade5a3cc3f259e3d7730"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/BACKGROUND_RESEARCH.md",
+      "bytes": 7165,
+      "sha256": "25ab3d452c32c3be36ca0591236a5e200ef4b91392780cdf576d6119e930ee0c"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/EXPERIMENT_SPEC.md",
+      "bytes": 42023,
+      "sha256": "e1d112756378383966a8a973200e89ecaf46abcd9173a2a6d9bb99521c677561"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/DUNNHUMBY_AUDIT.md",
+      "bytes": 7557,
+      "sha256": "aac2f0c2cf2234c67f41760c8fd0903c45719667926c089a840ac94b31e00060"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/PERSONA_COMPATIBILITY_AUDIT.md",
+      "bytes": 9635,
+      "sha256": "27346908768f8436409e0ca83e436a89b198c077d0e6bc2ac5b097b8fb1ce1ee"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/DATASET_COMPARISON.md",
+      "bytes": 1685,
+      "sha256": "22d97345d78679697d03a04e7aa1a3a51461a25e34234d752cc9cc6e1f4072a3"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/DATASET_SCHEMA_AUDIT.md",
+      "bytes": 16248,
+      "sha256": "cf17424d151c373b110134bf2544795cf40990d057502f5e4ad578e26cbe8108"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/X5_DATASET_AUDIT.md",
+      "bytes": 2171,
+      "sha256": "47c0b891a4af2a18205ef1afd673766de54256b12000792a9248dfcab89383a2"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/SHORT_VIDEO_DATASET_AUDIT.md",
+      "bytes": 2975,
+      "sha256": "11c7ba561c549dd103ef4af7b16d2e9353d92791af6b54f134415a9aa4e760a1"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/LOCAL_SMOKE_TEST.md",
+      "bytes": 2541,
+      "sha256": "b205c545c6358f1e9b179edfe7174d2b2a2925259640c9319faf5957a527f1c1"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/SMOKE_TEST_LOG.md",
+      "bytes": 3330,
+      "sha256": "f8ce731840799eb8f349a47681923c3773853b72a71699539c2ed48a81c65143"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/data/SOURCES.md",
+      "bytes": 3225,
+      "sha256": "ad248ae4bebc64e1fd5db80af99d66acf9b15fd48ffdeb290d631d752b542fc7"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/papers/READING_GUIDE.md",
+      "bytes": 18636,
+      "sha256": "0d038a0826e1566b26ad035be0e91c14131253fe8d7682d82df3e9a076d08825"
+    },
+    {
+      "path_relative_to_research_root": "matraix-thesis-feasibility/papers/00_MatrAIx_8_3_Billion_Persona_Agents.pdf",
+      "bytes": 16237598,
+      "sha256": "354f10b100a4b5933f8e22058cae7bb23bb2bdbc5d9f5b21ba0c8fda8821013d"
+    }
+  ]
+}

@@ -6,13 +6,13 @@ import re
 INSTRUMENT_ID = "thesis_e0a_synthetic_v1"
 
 
-def probability(payload):
+def probability(payload, instrument_id=INSTRUMENT_ID):
     if not isinstance(payload, dict):
         raise ValueError("answer envelope must be an object")
     if set(payload) != {"instrument", "answers"}:
         raise ValueError("unexpected or missing envelope fields")
     instrument = payload["instrument"]
-    if not isinstance(instrument, dict) or instrument.get("id") != INSTRUMENT_ID:
+    if not isinstance(instrument, dict) or instrument.get("id") != instrument_id:
         raise ValueError("wrong instrument identity")
     answers = payload["answers"]
     if not isinstance(answers, list) or len(answers) != 1:

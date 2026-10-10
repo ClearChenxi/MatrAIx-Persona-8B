@@ -124,7 +124,7 @@ def metadata(config):
     return result
 
 
-def preflight(config, destination):
+def preflight(config, destination, task=TASK):
     import yaml
     from matraix.agents.persona.loader import load_persona
     from matraix.agents.persona.templating import (
@@ -135,7 +135,7 @@ def preflight(config, destination):
     from playground.inprocess.survey_eval import build_survey_task_prompt
     from playground.survey_task_content import load_survey_task_content_for_task_path
 
-    content = load_survey_task_content_for_task_path(str(TASK), repo_root=ROOT)
+    content = load_survey_task_content_for_task_path(str(task), repo_root=ROOT)
     prompt = build_survey_task_prompt(instrument=content.instrument)
     for text in [
         content.instruction_markdown.strip(),
@@ -240,7 +240,9 @@ class Handler(BaseHTTPRequestHandler):
             ):
                 raise ValueError("model identity mismatch or incomplete generation")
             content = result["message"]["content"]
-            record["p_redeem"] = probability(json.loads(content))
+            record["p_redeem"] = probability(
+                json.loads(content), server.config.get("instrument_id", "thesis_e0a_synthetic_v1")
+            )
             output = {
                 "id": "e0a-local-adapter-" + trial.name,
                 "object": "chat.completion",
@@ -281,7 +283,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(response)
 
 
-async def run_trials(config, prepared, destination, server):
+async def run_trials(config, prepared, destination, server, task=TASK):
     from harbor.environments.host import HostEnvironment
     from harbor.models.agent.context import AgentContext
     from harbor.models.task.config import EnvironmentConfig
@@ -299,18 +301,18 @@ async def run_trials(config, prepared, destination, server):
             environment = HostEnvironment(
                 environment_dir=ROOT
                 / "environment/task-environments/application/shared-survey-form",
-                environment_name="e0a-synthetic",
+                environment_name=config.get("environment_name", "e0a-synthetic"),
                 session_id=trial.name,
                 trial_paths=paths,
                 task_env_config=EnvironmentConfig(
                     definition="application/shared-survey-form"
                 ),
-                tests_dir=TASK / "tests",
+                tests_dir=task / "tests",
             )
             agent = PersonaJsonSurvey(
                 logs_dir=paths.agent_dir,
                 persona_path=str(persona_path),
-                survey_task_path=str(TASK),
+                survey_task_path=str(task),
                 model_name="openai/" + config["model"],
             )
             context = AgentContext()

@@ -67,7 +67,10 @@ def verify(directory):
                 or raw["done_reason"] != "stop"
             ):
                 raise ValueError("incomplete or wrong model response")
-            value = probability(json.loads(raw["message"]["content"]))
+            value = probability(
+                json.loads(raw["message"]["content"]),
+                config.get("instrument_id", "thesis_e0a_synthetic_v1"),
+            )
             adapted = read(trial / "adapter_response.raw.json")
             if adapted["choices"][0]["message"]["content"] != raw["message"]["content"]:
                 raise ValueError("response content altered by adapter")
