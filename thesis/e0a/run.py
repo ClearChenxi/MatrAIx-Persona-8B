@@ -47,7 +47,9 @@ def sha(data):
 
 
 def git(*args):
-    return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
+    return subprocess.check_output(
+        ["git", "-c", "core.quotePath=false", *args], cwd=ROOT, text=True
+    ).strip()
 
 
 def local_network_guard(event, args):

@@ -48,6 +48,14 @@ def fixture():
 
 
 class HistoricalInputTests(unittest.TestCase):
+    def test_git_paths_preserve_chinese_filenames_for_guards_and_hashes(self):
+        paths = run.git("ls-files", "thesis/e0a/任务定义卡.md").splitlines()
+        self.assertEqual(paths, ["thesis/e0a/任务定义卡.md"])
+        self.assertTrue((run.ROOT / paths[0]).is_file())
+        changed = run.git("diff", "--name-only", plan()["official_commit"], "HEAD").splitlines()
+        self.assertIn(paths[0], changed)
+        self.assertFalse(any(name.startswith('"') for name in changed))
+
     def test_time_boundary_baskets_and_missingness(self):
         profiles, facts, audit = history.assemble(plan(), fixture())
         by_household = {row["household_key"]: next(p["behavior"] for p in profiles if p["id"] == row["profile"])
