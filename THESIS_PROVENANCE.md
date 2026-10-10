@@ -15,7 +15,7 @@ This repository is used as a fixed upstream baseline for a thesis experiment.
 ## Integration branch
 
 - Branch: `thesis-integration-3633d8d`
-- Fork remote: https://github.com/ClearKnight/MatrAIx-Persona-8B
+- Fork remote: https://github.com/ClearChenxi/MatrAIx-Persona-8B
 - Upstream remote: https://github.com/MatrAIx-ai/MatrAIx-Persona-8B
 
 All thesis-specific changes must be made on the integration branch. The
