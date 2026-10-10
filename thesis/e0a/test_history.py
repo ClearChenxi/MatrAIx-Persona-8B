@@ -178,6 +178,37 @@ class HistoricalInputTests(unittest.TestCase):
             self.assertEqual(len(config["profiles"]), 20)
             self.assertTrue((task / "input/context.md").is_file())
             self.assertEqual(json.loads((destination / "input_audit.json").read_text())["label_tables_opened"], [])
+            # An undersized real-style source must fail while preserving fingerprints,
+            # without producing a task/persona package or opening excluded inputs.
+            name = "campaign_table.csv"
+            records = rows[name][:2]
+            with (source / name).open("w", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(stream, fieldnames=records[0].keys())
+                writer.writeheader()
+                writer.writerows(records)
+            failed = root / "failed_preparation"
+            failed.mkdir()
+            with self.assertRaisesRegex(ValueError, "requested 20, eligible 2, participants 2"):
+                history.prepare(approved, failed)
+            self.assertEqual(json.loads((failed / "plan.json").read_text()), approved)
+            self.assertEqual(set(json.loads((failed / "source_hashes.json").read_text())), set(history.TABLES))
+            self.assertFalse((failed / "task").exists())
+
+    def test_metadata_diagnosis_uses_only_participation_and_dates(self):
+        from diagnose_history import inspect
+        approved = plan()
+        approved.update(execution_approved=True, status="confirmed", approval_reference="fixture only")
+        rows = fixture()
+        with patch.object(history, "source_path", side_effect=lambda d, n: Path(n)), \
+             patch.object(history, "digest", return_value="fixture hash"), \
+             patch.object(history, "table", side_effect=lambda d, n: iter(rows[n])) as reader:
+            result = inspect(approved)
+        self.assertEqual([c.args[1] for c in reader.call_args_list], ["campaign_desc.csv", "campaign_table.csv"])
+        record = result["development_metadata"][0]
+        self.assertEqual(record["unique_participants"], 21)
+        self.assertFalse(record["positive_purchase_eligibility_checked"])
+        self.assertEqual(result["model_calls"], 0)
+        self.assertFalse(result["labels_read"])
 
     def test_runner_does_not_execute_unconfirmed_plan(self):
         import run_history

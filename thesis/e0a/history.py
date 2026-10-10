@@ -159,7 +159,9 @@ def assemble(plan, rows):
         hashlib.sha256(f"{plan['sampling_seed']}:{campaign}:{h}".encode()).hexdigest(), h
     ))
     if len(eligible) < plan["sample_size"]:
-        raise ValueError("insufficient eligible households; do not expand/substitute automatically")
+        raise ValueError(f"insufficient eligible households: requested {plan['sample_size']}, "
+                         f"eligible {len(eligible)}, participants {len(participants)}; "
+                         "do not expand/substitute automatically")
     profiles, links = [], []
     for index, household in enumerate(eligible[:plan["sample_size"]], 1):
         s = state[household]
@@ -241,6 +243,9 @@ def prepare(plan, destination):
     directory = Path(plan["data_directory"]).resolve(strict=True)
     paths = {name: source_path(directory, name) for name in TABLES}
     before = {name: digest(path) for name, path in paths.items()}
+    # Retain the exact input plan and source fingerprints even if extraction fails.
+    (destination / "plan.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+    (destination / "source_hashes.json").write_text(json.dumps(before, ensure_ascii=False, indent=2), encoding="utf-8")
     profiles, facts, audit = assemble(plan, {name: table(directory, name) for name in TABLES})
     after = {name: digest(path) for name, path in paths.items()}
     if before != after:
