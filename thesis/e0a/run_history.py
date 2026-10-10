@@ -41,12 +41,12 @@ def main():
     parser.add_argument("--plan", type=Path, default=history.HERE / "history-plan.json")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--prepare-only", action="store_true", help="Approved real inputs and official prompt rendering; zero HTTP/model calls")
-    modes.add_argument("--execute", action="store_true", help="Requires recorded confirmation; maximum six local calls")
+    modes.add_argument("--execute", action="store_true", help="Requires recorded confirmation; maximum sixty local calls")
     args = parser.parse_args()
     plan = json.loads(args.plan.read_text())
     history.validate_plan(plan, require_approval=args.prepare_only or args.execute)
     if not (args.prepare_only or args.execute):
-        print("Proposal only. No source data read or model calls. User confirmation remains pending.")
+        print(f"Plan display only. No source data read or model calls. Status: {plan['status']}.")
         return
     pinned = json.loads((history.HERE / "config.json").read_text())
     for key in ("official_commit", "model", "options", "think"):
@@ -60,7 +60,8 @@ def main():
                 "official_commit": plan["official_commit"], "branch": run.git("branch", "--show-current"),
                 "approval_reference": plan["approval_reference"], "plan_sha256": history.digest(args.plan),
                 "actual_generations": 0, "identity": "MatrAIx-compatible domain persona agent, official open-source Survey Agent, local Qwen backend",
-                "cohort": {"id": "thesis-e0a-history-27-v1", "sampling": plan["sampling"], "seed": plan["sampling_seed"]},
+                "cohort": {"id": "thesis-e0a-history-27-20x3-v1", "sampling": plan["sampling"], "seed": plan["sampling_seed"], "sample_size": plan["sample_size"]},
+                "repetitions": plan["repetitions"], "maximum_generations": plan["maximum_generations"],
                 "task_id": plan["instrument_id"], "agent": "matraix.agents.persona.json_survey:PersonaJsonSurvey",
                 "agent_version": "1.0.0", "invocation": "direct official Agent + HostEnvironment; no CLI scheduler/reward verifier",
                 "backend_provider": "local Ollama", "protocol_alias": "openai/" + plan["model"],
@@ -100,14 +101,9 @@ def main():
         run.save(destination / "ollama_after.json", after)
         if before["model_digest"] != after["model_digest"] or before["version"]["data"] != after["version"]["data"]:
             raise RuntimeError("model/runtime changed during execution")
-        if server.budget.count != 6 or len(rows) != 6:
-            raise RuntimeError("expected exactly six accepted generations")
-        pairs = []
-        for profile in config["profiles"]:
-            pair = [r for r in rows if r["profile"] == profile["id"]]
-            if len(pair) != 2 or pair[0]["message_sha256"] != pair[1]["message_sha256"]:
-                raise RuntimeError("repetition inputs differ")
-            pairs.append({"profile": profile["id"], "absolute_difference": abs(pair[0]["p_redeem"] - pair[1]["p_redeem"])})
+        if server.budget.count != plan["maximum_generations"] or len(rows) != plan["maximum_generations"]:
+            raise RuntimeError("expected exactly the approved number of accepted generations")
+        pairs = repetition_summary(config, rows)
         run.save(destination / "summary.json", {"status": "passed", "actual_generations": server.budget.count,
                  "rows": rows, "repetition_comparison": pairs, "accuracy_evaluated": False})
         manifest["status"] = "passed"
@@ -125,6 +121,20 @@ def main():
         run.save(destination / "checksums.json", run.hashes(destination))
         print(f"Local evidence: {destination}", flush=True)
     print(json.dumps(verify(destination), ensure_ascii=False, indent=2))
+
+
+def repetition_summary(config, rows):
+    comparisons = []
+    for profile in config["profiles"]:
+        repeated = [r for r in rows if r["profile"] == profile["id"]]
+        if (len(repeated) != config["repetitions"]
+                or {r["repetition"] for r in repeated} != set(range(1, config["repetitions"] + 1))
+                or len({r["message_sha256"] for r in repeated}) != 1):
+            raise RuntimeError("repetition inputs or identities differ")
+        values = [r["p_redeem"] for r in sorted(repeated, key=lambda r: r["repetition"])]
+        comparisons.append({"profile": profile["id"], "values": values,
+                            "mean": sum(values) / len(values), "range": max(values) - min(values)})
+    return comparisons
 
 
 if __name__ == "__main__":

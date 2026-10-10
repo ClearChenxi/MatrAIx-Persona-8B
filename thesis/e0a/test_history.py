@@ -14,7 +14,9 @@ from validation import probability
 
 
 def plan():
-    return json.loads((history.HERE / "history-plan.json").read_text())
+    result = json.loads((history.HERE / "history-plan.json").read_text())
+    result.update(execution_approved=False, status="proposal_pending_user_confirmation", approval_reference=None)
+    return result
 
 
 def transaction(household, day, product="p1", amount="2.00", basket=None, quantity="1"):
@@ -26,7 +28,8 @@ def fixture():
     return {
         "campaign_desc.csv": [{"CAMPAIGN": "27", "DESCRIPTION": "TypeC", "START_DAY": "237", "END_DAY": "300"}],
         "campaign_table.csv": [{"CAMPAIGN": "27", "DESCRIPTION": "TypeC", "household_key": h}
-                               for h in ("invented_a", "invented_b", "invented_c", "invented_without_history")],
+                               for h in ("invented_a", "invented_b", "invented_c", "invented_without_history",
+                                         *(f"invented_extra_{i}" for i in range(17)))],
         "coupon.csv": [{"CAMPAIGN": "27", "COUPON_UPC": c, "PRODUCT_ID": p}
                        for c, p in (("c1", "p1"), ("c1", "p2"), ("c2", "p1"), ("c2", "p4"), ("c1", "p1"))],
         "product.csv": [{"PRODUCT_ID": p, "COMMODITY_DESC": c}
@@ -43,7 +46,7 @@ def fixture():
             transaction("not_participating", 220, amount="not a number"),
             transaction("invented_a", 200, amount="-9.00", quantity="-1"),
             transaction("invented_a", 200, amount="0.00", quantity="0"),
-        ],
+        ] + [transaction(f"invented_extra_{i}", 210) for i in range(17)],
     }
 
 
@@ -70,7 +73,7 @@ class HistoricalInputTests(unittest.TestCase):
         self.assertEqual(by_household["invented_b"]["days_since_last_target_product_purchase"], "unknown: no target purchase in window")
         self.assertEqual(by_household["invented_c"]["target_product_sales_share"], "unknown: zero total sales")
         self.assertEqual(a["historical_redemption"], "unknown: redemption table not accessed")
-        self.assertEqual(audit["eligible_with_positive_purchase"], 3)
+        self.assertEqual(audit["eligible_with_positive_purchase"], 20)
         self.assertEqual(audit["label_tables_opened"], [])
         self.assertEqual(facts["valid_days"], 64)
 
@@ -91,7 +94,7 @@ class HistoricalInputTests(unittest.TestCase):
         for data in rows.values():
             data.reverse()
         self.assertEqual(history.assemble(plan(), rows), expected)
-        self.assertEqual(len(expected[2]["selected"]), 3)
+        self.assertEqual(len(expected[2]["selected"]), 20)
 
     def test_scope_cannot_silently_expand(self):
         for key, value in (("campaign_type", "TypeA"), ("campaign", "14"), ("end_day", 600),
@@ -172,14 +175,15 @@ class HistoricalInputTests(unittest.TestCase):
             config, task = history.prepare(approved, destination)
             hashes = json.loads((destination / "source_hashes.json").read_text())
             self.assertEqual(set(hashes), set(history.TABLES))
-            self.assertEqual(len(config["profiles"]), 3)
+            self.assertEqual(len(config["profiles"]), 20)
             self.assertTrue((task / "input/context.md").is_file())
             self.assertEqual(json.loads((destination / "input_audit.json").read_text())["label_tables_opened"], [])
 
     def test_runner_does_not_execute_unconfirmed_plan(self):
         import run_history
         with patch.object(history, "prepare", side_effect=AssertionError("must not prepare data")), \
-             patch.object(run, "native", side_effect=AssertionError("must not call model")):
+             patch.object(run, "native", side_effect=AssertionError("must not call model")), \
+             patch.object(run_history.json, "loads", return_value=plan()):
             with patch("sys.argv", ["run_history.py"]):
                 run_history.main()
             for mode in ("--prepare-only", "--execute"):
@@ -200,7 +204,7 @@ class HistoricalInputTests(unittest.TestCase):
                  history.task_binding(task):
                 prepared = run.preflight(dict(plan(), profiles=profiles), destination, task=task)
             self.assertEqual(SURVEY_TASK_FOLDER_BY_QUESTIONNAIRE_ID, original)
-            self.assertEqual(len(prepared), 3)
+            self.assertEqual(len(prepared), 20)
             for _, _, messages in prepared:
                 text = json.dumps(messages, ensure_ascii=False)
                 self.assertIn("thesis_e0a_history_v1", text)
@@ -209,6 +213,66 @@ class HistoricalInputTests(unittest.TestCase):
                 self.assertIn('valid_days', text)
                 for identifier in ("invented_a", "invented_b", "invented_c", "history_1"):
                     self.assertNotIn(identifier, text)
+
+    def test_third_repetition_input_and_identity_are_checked(self):
+        from run_history import repetition_summary
+        config = {"profiles": [{"id": "invented_a"}], "repetitions": 3}
+        rows = [{"profile": "invented_a", "repetition": r, "message_sha256": "same",
+                 "p_redeem": value} for r, value in enumerate([0.1, 0.2, 0.4], 1)]
+        result = repetition_summary(config, rows)[0]
+        self.assertAlmostEqual(result["range"], 0.3)
+        self.assertEqual(result["values"], [0.1, 0.2, 0.4])
+        rows[2]["message_sha256"] = "changed"
+        with self.assertRaisesRegex(RuntimeError, "repetition"):
+            repetition_summary(config, rows)
+        rows[2].update(message_sha256="same", repetition=2)
+        with self.assertRaisesRegex(RuntimeError, "repetition"):
+            repetition_summary(config, rows)
+
+    def test_approved_budget_stops_after_sixty_unique_trials(self):
+        from validation import CallBudget
+        budget = CallBudget(plan()["maximum_generations"])
+        for household in range(20):
+            for repetition in range(3):
+                budget.claim(f"invented_{household}_r{repetition}")
+        self.assertEqual(budget.count, 60)
+        with self.assertRaises(ValueError):
+            budget.claim("unexpected_sixty_first")
+
+    def test_independent_verifier_rejects_changed_third_repetition(self):
+        import shutil
+        from verify import verify
+        source = history.HERE / "runs/20261010T081210.118577Z"
+        if not source.is_dir():
+            self.skipTest("local synthetic evidence is not distributed on GitHub")
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            config = json.loads((source / "config.json").read_text())
+            config.update(profiles=config["profiles"][:1], repetitions=3, maximum_generations=3)
+            run.save(target / "config.json", config)
+            manifest = json.loads((source / "agent_manifest.json").read_text())
+            manifest["actual_generations"] = 3
+            run.save(target / "agent_manifest.json", manifest)
+            for name in ("ollama_before.json", "ollama_after.json"):
+                shutil.copy2(source / name, target / name)
+            template = json.loads((source / "summary.json").read_text())["rows"][0]
+            rows = []
+            for repetition in range(1, 4):
+                trial = f"{template['profile']}_r{repetition}"
+                shutil.copytree(source / f"{template['profile']}_r1", target / trial)
+                rows.append(dict(template, repetition=repetition))
+            run.save(target / "summary.json", {"status": "passed", "actual_generations": 3, "rows": rows})
+            run.save(target / "checksums.json", run.hashes(target))
+            self.assertEqual(verify(target)["verified_generations"], 3)
+            third = target / f"{template['profile']}_r3"
+            for name in ("expected_messages.json", "official_request_1.json", "ollama_request.json"):
+                data = json.loads((third / name).read_text())
+                messages = data if isinstance(data, list) else data["messages"]
+                messages[0]["content"] += " changed third input"
+                run.save(third / name, data)
+            run.save(target / "checksums.json", run.hashes(target))
+            with self.assertRaisesRegex(ValueError, "prompts differ"):
+                verify(target)
 
 
 if __name__ == "__main__":

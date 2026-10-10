@@ -39,7 +39,7 @@ def validate_plan(plan, require_approval=False):
         raise ValueError("sampling/task identity differs from reviewed scope")
     if plan["sampling"] != "sha256(seed:campaign:household_key), ascending, eligible households only":
         raise ValueError("sampling declaration differs from implementation")
-    if (plan["history_window_days"], plan["sample_size"], plan["repetitions"], plan["maximum_generations"]) != (84, 3, 2, 6):
+    if (plan["history_window_days"], plan["sample_size"], plan["repetitions"], plan["maximum_generations"]) != (84, 20, 3, 60):
         raise ValueError("scope changes require a new reviewed implementation")
     if plan["allowed_tables"] != list(TABLES) or plan["labels_accessible"] is not False:
         raise ValueError("table whitelist or label permissions changed")

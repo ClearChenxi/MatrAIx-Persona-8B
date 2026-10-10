@@ -24,12 +24,38 @@ def verify(directory):
     config = read(directory / "config.json")
     manifest = read(directory / "agent_manifest.json")
     summary = read(directory / "summary.json")
+    repetitions = config["repetitions"]
+    expected_count = len(config["profiles"]) * repetitions
+    if expected_count != config["maximum_generations"]:
+        raise ValueError("configuration count does not match generation limit")
+    expected_trials = {f"{p['id']}_r{r}" for p in config["profiles"] for r in range(1, repetitions + 1)}
+    actual_trials = {str(p.parent.relative_to(directory)) for p in directory.rglob("official_request_*.json")}
+    if actual_trials != expected_trials:
+        raise ValueError("missing or additional trial requests")
     if (
         manifest["status"] != "passed"
         or summary["status"] != "passed"
-        or manifest["actual_generations"] != 6
+        or manifest["actual_generations"] != expected_count
+        or summary["actual_generations"] != expected_count
     ):
-        raise ValueError("run did not pass six generations")
+        raise ValueError("run did not pass the configured generation count")
+    historical = config.get("instrument_id") == "thesis_e0a_history_v1"
+    if historical:
+        import history
+        history.validate_plan(config, require_approval=True)
+        audit = read(directory / "input_audit.json")
+        if (audit["lower_inclusive"] != 153 or audit["cutoff_exclusive"] != 237
+                or audit["label_tables_opened"] != [] or audit["accuracy_evaluated"] is not False
+                or len(audit["selected"]) != config["sample_size"]
+                or [r["profile"] for r in audit["selected"]] != [p["id"] for p in config["profiles"]]
+                or len({r["household_key"] for r in audit["selected"]}) != config["sample_size"]):
+            raise ValueError("historical input scope inconsistent")
+        if set(read(directory / "source_hashes.json")) != set(history.TABLES):
+            raise ValueError("historical source whitelist inconsistent")
+        preflight = read(directory / "preflight_messages.json")
+        for name, digest in manifest["prepared_input_hashes"].items():
+            if checksums.get(name) != digest:
+                raise ValueError("prepared inputs changed after preflight")
     before, after = [
         read(directory / f"ollama_{name}.json") for name in ["before", "after"]
     ]
@@ -39,10 +65,13 @@ def verify(directory):
         or before["version"]["data"] != after["version"]["data"]
     ):
         raise ValueError("model/runtime fingerprint changed")
+    if historical and (before["model_digest"] != config["expected_model_digest"]
+                       or before["version"]["data"]["version"] != config["expected_ollama_version"]):
+        raise ValueError("historical model/runtime differs from approved plan")
     rows = []
     for profile in config["profiles"]:
         repeated = []
-        for repetition in [1, 2]:
+        for repetition in range(1, repetitions + 1):
             trial = directory / f"{profile['id']}_r{repetition}"
             if (
                 len(list(trial.glob("official_request_*.json"))) != 1
@@ -50,6 +79,8 @@ def verify(directory):
             ):
                 raise ValueError("unexpected HTTP attempts")
             expected = read(trial / "expected_messages.json")
+            if historical:
+                check_messages(expected, preflight[profile["id"]])
             official = read(trial / "official_request_1.json")
             native = read(trial / "ollama_request.json")
             check_messages(official["messages"], expected)
@@ -93,12 +124,17 @@ def verify(directory):
                 raise ValueError("summary differs from raw evidence")
             rows.append(matches[0])
             repeated.append(expected)
-        check_messages(repeated[0], repeated[1])
-    if len(rows) != 6 or len(summary["rows"]) != 6:
+        for messages in repeated[1:]:
+            check_messages(repeated[0], messages)
+    if len(rows) != expected_count or len(summary["rows"]) != expected_count:
         raise ValueError("unexpected trial count")
+    if historical:
+        from run_history import repetition_summary
+        if summary["repetition_comparison"] != repetition_summary(config, rows):
+            raise ValueError("repetition summary differs from verified raw values")
     return {
         "verified_files": len(actual),
-        "verified_generations": 6,
+        "verified_generations": expected_count,
         "code_commit": manifest["code_commit"],
         "model_digest": manifest["model_digest"],
         "rows": rows,
