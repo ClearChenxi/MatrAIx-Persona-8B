@@ -15,7 +15,8 @@ from validation import probability
 
 def plan():
     result = json.loads((history.HERE / "history-plan.json").read_text())
-    result.update(execution_approved=False, status="proposal_pending_user_confirmation", approval_reference=None)
+    result.update(campaign="27", campaign_type="TypeC", start_day=237, end_day=300,
+                  execution_approved=False, status="proposal_pending_user_confirmation", approval_reference=None)
     return result
 
 
@@ -51,6 +52,33 @@ def fixture():
 
 
 class HistoricalInputTests(unittest.TestCase):
+    def test_campaign29_boundaries_and_sampling_use_approved_campaign(self):
+        approved = plan()
+        approved.update(campaign="29", campaign_type="TypeB", start_day=281, end_day=334)
+        rows = fixture()
+        rows["campaign_desc.csv"] = [{"CAMPAIGN": "29", "DESCRIPTION": "TypeB", "START_DAY": "281", "END_DAY": "334"}]
+        for row in rows["campaign_table.csv"]:
+            row.update(CAMPAIGN="29", DESCRIPTION="TypeB")
+        for row in rows["coupon.csv"]:
+            row["CAMPAIGN"] = "29"
+        for row in rows["transaction_data.csv"]:
+            row["DAY"] = str(int(row["DAY"]) + 44)
+        profiles, facts, audit = history.assemble(approved, rows)
+        self.assertEqual((audit["lower_inclusive"], audit["cutoff_exclusive"]), (197, 281))
+        self.assertEqual(facts["valid_days"], 54)
+        self.assertEqual(len(profiles), 20)
+        selected = next(row for row in audit["selected"] if row["household_key"] == "invented_a")
+        behavior = next(p["behavior"] for p in profiles if p["id"] == selected["profile"])
+        self.assertEqual(behavior["positive_purchase_sales_value"], "10.00")
+        self.assertEqual(behavior["days_since_last_positive_purchase"], 1)
+        self.assertEqual(behavior["days_since_last_target_product_purchase"], 84)
+        import hashlib
+        self.assertTrue(all(row["sampling_hash"] == hashlib.sha256(
+            f"20261010:29:{row['household_key']}".encode()).hexdigest() for row in audit["selected"]))
+        approved["start_day"] = 282
+        with self.assertRaises(ValueError):
+            history.validate_plan(approved)
+
     def test_git_paths_preserve_chinese_filenames_for_guards_and_hashes(self):
         paths = run.git("ls-files", "thesis/e0a/任务定义卡.md").splitlines()
         self.assertEqual(paths, ["thesis/e0a/任务定义卡.md"])

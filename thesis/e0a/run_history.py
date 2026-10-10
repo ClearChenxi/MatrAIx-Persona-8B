@@ -60,7 +60,7 @@ def main():
                 "official_commit": plan["official_commit"], "branch": run.git("branch", "--show-current"),
                 "approval_reference": plan["approval_reference"], "plan_sha256": history.digest(args.plan),
                 "actual_generations": 0, "identity": "MatrAIx-compatible domain persona agent, official open-source Survey Agent, local Qwen backend",
-                "cohort": {"id": "thesis-e0a-history-27-20x3-v1", "sampling": plan["sampling"], "seed": plan["sampling_seed"], "sample_size": plan["sample_size"]},
+                "cohort": {"id": f"thesis-e0a-history-{plan['campaign']}-20x3-v1", "sampling": plan["sampling"], "seed": plan["sampling_seed"], "sample_size": plan["sample_size"]},
                 "repetitions": plan["repetitions"], "maximum_generations": plan["maximum_generations"],
                 "task_id": plan["instrument_id"], "agent": "matraix.agents.persona.json_survey:PersonaJsonSurvey",
                 "agent_version": "1.0.0", "invocation": "direct official Agent + HostEnvironment; no CLI scheduler/reward verifier",

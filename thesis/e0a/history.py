@@ -33,8 +33,9 @@ def validate_plan(plan, require_approval=False):
         raise ValueError("only proposed historical development Type B/C campaigns allowed")
     if not (plan["end_day"] < 435 and plan["start_day"] < plan["end_day"]):
         raise ValueError("campaign must finish before historical validation starts")
-    if (plan["campaign"], plan["campaign_type"], plan["start_day"], plan["end_day"]) != ("27", "TypeC", 237, 300):
-        raise ValueError("only campaign 27 with reviewed dates/type is implemented")
+    reviewed_campaigns = {("27", "TypeC", 237, 300), ("29", "TypeB", 281, 334)}
+    if (plan["campaign"], plan["campaign_type"], plan["start_day"], plan["end_day"]) not in reviewed_campaigns:
+        raise ValueError("only reviewed campaigns 27/29 with exact dates/type are implemented")
     if (plan["sampling_seed"], plan["instrument_id"], plan["environment_name"]) != (20261010, "thesis_e0a_history_v1", "e0a-history"):
         raise ValueError("sampling/task identity differs from reviewed scope")
     if plan["sampling"] != "sha256(seed:campaign:household_key), ascending, eligible households only":

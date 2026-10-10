@@ -51,6 +51,7 @@ def inspect(plan):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", type=Path, required=True, help="Stopped preparation package")
+    parser.add_argument("--plan", type=Path, default=history.HERE / "history-plan.json", help="Exact original plan matching failed manifest")
     args = parser.parse_args()
     manifest = json.loads((args.run / "agent_manifest.json").read_text())
     expected_hashes = json.loads((args.run / "checksums.json").read_text())
@@ -60,7 +61,7 @@ def main():
         raise ValueError("this diagnostic only applies to zero-call failed preparation")
     if any(args.run.rglob("official_request_*.json")) or any(args.run.rglob("ollama_request.json")):
         raise ValueError("generation requests exist in stopped package")
-    plan_path = history.HERE / "history-plan.json"
+    plan_path = args.plan
     if history.digest(plan_path) != manifest["plan_sha256"]:
         raise ValueError("plan changed since failed preparation")
     result = inspect(json.loads(plan_path.read_text()))

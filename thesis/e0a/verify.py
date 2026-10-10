@@ -44,11 +44,14 @@ def verify(directory):
         import history
         history.validate_plan(config, require_approval=True)
         audit = read(directory / "input_audit.json")
-        if (audit["lower_inclusive"] != 153 or audit["cutoff_exclusive"] != 237
+        if (audit["lower_inclusive"] != config["start_day"] - config["history_window_days"]
+                or audit["cutoff_exclusive"] != config["start_day"]
                 or audit["label_tables_opened"] != [] or audit["accuracy_evaluated"] is not False
                 or len(audit["selected"]) != config["sample_size"]
                 or [r["profile"] for r in audit["selected"]] != [p["id"] for p in config["profiles"]]
-                or len({r["household_key"] for r in audit["selected"]}) != config["sample_size"]):
+                or len({r["household_key"] for r in audit["selected"]}) != config["sample_size"]
+                or any(r["campaign"] != config["campaign"] for r in audit["selected"])
+                or manifest["cohort"]["id"] != f"thesis-e0a-history-{config['campaign']}-20x3-v1"):
             raise ValueError("historical input scope inconsistent")
         if set(read(directory / "source_hashes.json")) != set(history.TABLES):
             raise ValueError("historical source whitelist inconsistent")
