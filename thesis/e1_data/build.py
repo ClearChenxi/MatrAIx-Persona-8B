@@ -319,7 +319,11 @@ def persona_input(row):
             "brand_type_sales_shares": brand,
             "target_product_sales_share": row["target_product_sales_share"] or "unknown: zero total sales",
             "target_commodity_sales_share": row["target_commodity_sales_share"] or "unknown: zero total sales",
-            "days_since_last_target_product_purchase": row["target_product_recency_days"] or "unknown: no target product purchase",
+            "days_since_last_target_product_purchase": (
+                int(row["target_product_recency_days"])
+                if row["target_product_recency_days"] != ""
+                else "unknown: no target product purchase"
+            ),
         },
         "campaign_facts": {
             "campaign_type": row["campaign_type"],

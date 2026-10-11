@@ -66,6 +66,7 @@ class E1DataUnitTests(unittest.TestCase):
             "department_spend_shares_json": '{"FOOD":"1.000000","<OTHER>":"0.000000"}',
             "brand_type_spend_shares_json": '{"National":"1.000000","<OTHER>":"0.000000"}',
             "target_product_sales_share": "0.100000", "target_commodity_sales_share": "0.200000",
+            "target_product_recency_days": "23",
             "campaign_type": "TypeB", "campaign_valid_days": "33", "campaign_unique_coupon_count": "4",
             "campaign_unique_product_count": "10", "campaign_department_count": "1",
             "campaign_commodity_count": "2", "campaign_brand_type_count": "1",
@@ -73,7 +74,9 @@ class E1DataUnitTests(unittest.TestCase):
             "campaign_brand_type_weights_json": '{"National":"1.000000","<OTHER>":"0.000000"}',
             "campaign_other_commodity_weight": "0.000000",
         })
-        rendered = json.dumps(persona_input(row), ensure_ascii=False)
+        payload = persona_input(row)
+        rendered = json.dumps(payload, ensure_ascii=False)
+        self.assertEqual(payload["observed_household"]["days_since_last_target_product_purchase"], 23)
         self.assertNotIn("opaque", rendered)
         self.assertNotIn("row_id", rendered)
         self.assertNotIn("household_key", rendered)
