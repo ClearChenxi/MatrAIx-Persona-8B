@@ -23,8 +23,12 @@
       "minimum": 2,
       "distinct_resolved_directories": true,
       "distinct_storage_location_ids": true,
+      "distinct_filesystem_device_ids": true,
       "live_copy_restore_and_sha256": true
     },
+    "authoritative_plaintext_paths_must_not_exist": true,
+    "pre_removal_inventory_required": true,
+    "unreadable_candidate_fails_closed": true,
     "public_time_attestation": {
       "repository": "ClearChenxi/MatrAIx-Persona-8B",
       "signer_workflow": "github.com/ClearChenxi/MatrAIx-Persona-8B/.github/workflows/attest-prediction-freeze.yml",
@@ -118,7 +122,7 @@
       "required_prediction_sets": ["E1", "E1a", "E2"]
     }
   },
-  "plaintext_that_must_become_inaccessible_after_seal": [
+  "plaintext_paths_that_must_not_exist_after_seal": [
     "private/labels_T_SEALED.csv",
     "private/label_summary_PRIVATE.json",
     "coupon_redempt.csv",

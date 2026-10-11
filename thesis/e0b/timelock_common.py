@@ -123,8 +123,12 @@ def validate_policy(policy, require_schedule=True):
             "minimum": 2,
             "distinct_resolved_directories": True,
             "distinct_storage_location_ids": True,
+            "distinct_filesystem_device_ids": True,
             "live_copy_restore_and_sha256": True,
         },
+        "authoritative_plaintext_paths_must_not_exist": True,
+        "pre_removal_inventory_required": True,
+        "unreadable_candidate_fails_closed": True,
         "public_time_attestation": {
             "repository": "ClearChenxi/MatrAIx-Persona-8B",
             "signer_workflow": "github.com/ClearChenxi/MatrAIx-Persona-8B/.github/workflows/attest-prediction-freeze.yml",
@@ -133,6 +137,15 @@ def validate_policy(policy, require_schedule=True):
     }
     if policy.get("governance_controls") != expected_governance:
         raise ValueError("timelock governance controls changed")
+    expected_plaintext_paths = [
+        "private/labels_T_SEALED.csv",
+        "private/label_summary_PRIVATE.json",
+        "coupon_redempt.csv",
+        "transaction_data.csv",
+        "original_archive",
+    ]
+    if policy.get("plaintext_paths_that_must_not_exist_after_seal") != expected_plaintext_paths:
+        raise ValueError("protected plaintext removal rules changed")
     if not require_schedule:
         return timelock
     if policy.get("status") != "timelock_schedule_registered" or timelock.get("status") != "registered":
@@ -440,10 +453,10 @@ def plaintext_paths(run_dir):
     }
 
 
-def verify_inaccessible(paths):
-    readable = [name for name, path in paths.items() if path.exists() and os.access(path, os.R_OK)]
-    if readable:
-        raise ValueError(f"protected plaintext remains readable by executor: {', '.join(sorted(readable))}")
+def verify_absent(paths):
+    present = [name for name, path in paths.items() if os.path.lexists(path)]
+    if present:
+        raise ValueError(f"protected plaintext path still exists: {', '.join(sorted(present))}")
 
 
 def plaintext_scan_roots(repository, run_dir):
@@ -457,7 +470,28 @@ def plaintext_scan_roots(repository, run_dir):
     return sorted(roots, key=str)
 
 
-def find_matching_plaintext(search_roots, commitments):
+def physical_plaintext_commitments(manifest):
+    label = manifest["objects"]["T_adaptation_labels"]
+    commitments = {
+        "sealed_T_labels_parent": {
+            "sha256": label["source_parent_sha256"],
+            "bytes": label["source_parent_bytes"],
+        }
+    }
+    for object_id in ("private_label_summary", "redemption_source", "transaction_source", "original_archive"):
+        record = manifest["objects"][object_id]
+        commitments[object_id] = {
+            "sha256": record["plaintext_sha256"],
+            "bytes": record["plaintext_bytes"],
+        }
+    return commitments
+
+
+def _raise_scan_error(error):
+    raise ValueError(f"plaintext scan could not inspect declared scope: {error.filename or error}") from error
+
+
+def find_matching_plaintext(search_roots, commitments, digest_file=digest):
     by_size = {}
     for object_id, record in commitments.items():
         by_size.setdefault(record["bytes"], {})[record["sha256"]] = object_id
@@ -466,20 +500,41 @@ def find_matching_plaintext(search_roots, commitments):
     for root in search_roots:
         if not root.exists() or not root.is_dir():
             raise ValueError(f"plaintext scan root is missing or not a directory: {root}")
-        for path in root.rglob("*"):
-            if path.is_symlink() or not path.is_file() or not os.access(path, os.R_OK):
-                continue
-            resolved = path.resolve()
-            if resolved in scanned:
-                continue
-            scanned.add(resolved)
-            candidates = by_size.get(path.stat().st_size)
-            if not candidates:
-                continue
-            actual = digest(path)
-            if actual in candidates:
-                matches.append({"object_id": candidates[actual], "path": str(resolved)})
-    return matches
+        for directory, directory_names, file_names in os.walk(root, followlinks=False, onerror=_raise_scan_error):
+            parent = Path(directory)
+            for name in directory_names:
+                path = parent / name
+                if path.is_symlink():
+                    raise ValueError(f"plaintext scan cannot inspect symlinked directory: {path}")
+            for name in file_names:
+                path = parent / name
+                if path.is_symlink():
+                    raise ValueError(f"plaintext scan cannot inspect symlinked file: {path}")
+                try:
+                    resolved = path.resolve(strict=True)
+                    stat = path.stat()
+                except OSError as error:
+                    raise ValueError(f"plaintext scan could not inspect candidate path: {path}") from error
+                if not resolved.is_file():
+                    continue
+                candidates = by_size.get(stat.st_size)
+                if not candidates:
+                    continue
+                if resolved in scanned:
+                    continue
+                scanned.add(resolved)
+                try:
+                    actual = digest_file(resolved)
+                except OSError as error:
+                    raise ValueError(f"candidate plaintext file cannot be inspected: {path}") from error
+                if actual in candidates:
+                    matches.append({
+                        "object_id": candidates[actual],
+                        "path": str(resolved),
+                        "bytes": stat.st_size,
+                        "sha256": actual,
+                    })
+    return sorted(matches, key=lambda item: (item["object_id"], item["path"]))
 
 
 def object_rules(policy):

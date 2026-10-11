@@ -13,10 +13,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from audit import canonical_json, digest
+from create_timelock_replicas import filesystem_device_id
 from timelock_common import (
     COMMIT, EXPECTED_BRANCH, SHA256, fetch_beacon_state, object_rules,
-    find_matching_plaintext, parse_ciphertext_identity, parse_utc, plaintext_paths,
-    plaintext_scan_roots, run_git, source_commitments, validate_policy, verify_inaccessible,
+    find_matching_plaintext, parse_ciphertext_identity, parse_utc, physical_plaintext_commitments,
+    plaintext_paths, plaintext_scan_roots, run_git, source_commitments, validate_policy, verify_absent,
     validate_prediction_contract_file,
 )
 
@@ -93,9 +94,9 @@ def validate_seal_manifest(policy, policy_path, run_dir, manifest, manifest_dir)
     return timelock
 
 
-def validate_replicas(replica_manifest_path, seal_manifest_path):
+def validate_replicas(replica_manifest_path, seal_manifest_path, device_resolver=filesystem_device_id):
     replica_manifest = json.loads(replica_manifest_path.read_text(encoding="utf-8"))
-    if replica_manifest.get("schema_version") != "1.0" or replica_manifest.get("status") != "two_replicas_verified":
+    if replica_manifest.get("schema_version") != "2.0" or replica_manifest.get("status") != "two_replicas_verified":
         raise ValueError("invalid timelock replica manifest identity")
     if replica_manifest.get("timelock_seal_manifest_sha256") != digest(seal_manifest_path):
         raise ValueError("replicas point to a different timelock seal")
@@ -112,6 +113,7 @@ def validate_replicas(replica_manifest_path, seal_manifest_path):
     if None in locations or len(locations) != len(replicas):
         raise ValueError("timelock replica storage locations must be nonempty and distinct")
     directories = set()
+    device_ids = set()
     with tempfile.TemporaryDirectory() as recovery_directory:
         recovery_root = Path(recovery_directory)
         for record in replicas:
@@ -119,6 +121,10 @@ def validate_replicas(replica_manifest_path, seal_manifest_path):
             if directory in directories:
                 raise ValueError("timelock replicas resolve to the same directory")
             directories.add(directory)
+            actual_device_id = device_resolver(directory)
+            if record.get("filesystem_device_id") != actual_device_id:
+                raise ValueError("timelock replica filesystem device differs from manifest")
+            device_ids.add(actual_device_id)
             if record.get("files") != expected or record.get("restoration_test_passed") is not True:
                 raise ValueError("timelock replica inventory or restoration declaration differs")
             for name, checksum in expected.items():
@@ -129,20 +135,76 @@ def validate_replicas(replica_manifest_path, seal_manifest_path):
                 shutil.copyfile(source, recovered)
                 if digest(recovered) != checksum:
                     raise ValueError(f"timelock replica restoration checksum mismatch: {name}")
+    if len(device_ids) != len(replicas):
+        raise ValueError("timelock replicas are not on distinct filesystem devices")
     return len(replicas)
 
 
-def plaintext_commitments(manifest):
-    commitments = {
-        object_id: {"sha256": record["plaintext_sha256"], "bytes": record["plaintext_bytes"]}
-        for object_id, record in manifest["objects"].items()
+def validate_plaintext_inventory(inventory_path, manifest_path, run_dir, repository):
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    if inventory.get("schema_version") != "1.0" or inventory.get("status") != "plaintext_inventory_complete":
+        raise ValueError("invalid plaintext inventory identity")
+    if inventory.get("timelock_seal_manifest_sha256") != digest(manifest_path):
+        raise ValueError("plaintext inventory points to a different timelock seal")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    commitments = physical_plaintext_commitments(manifest)
+    roots = plaintext_scan_roots(repository, run_dir)
+    expected_roots = [str(path) for path in roots]
+    if inventory.get("scan_roots") != expected_roots:
+        raise ValueError("plaintext inventory scan roots differ from current declaration")
+
+    expected_authoritative = {
+        object_id: {
+            "object_id": object_id,
+            "path": str(path.resolve()),
+            "bytes": commitments[object_id]["bytes"],
+            "sha256": commitments[object_id]["sha256"],
+        }
+        for object_id, path in plaintext_paths(run_dir).items()
     }
-    label = manifest["objects"]["T_adaptation_labels"]
-    commitments["sealed_T_labels_parent"] = {
-        "sha256": label["source_parent_sha256"],
-        "bytes": label["source_parent_bytes"],
-    }
-    return commitments
+    authoritative = inventory.get("authoritative_plaintext")
+    if not isinstance(authoritative, list):
+        raise ValueError("plaintext inventory authoritative path list is missing")
+    authoritative_map = {record.get("object_id"): record for record in authoritative}
+    if None in authoritative_map or len(authoritative_map) != len(authoritative):
+        raise ValueError("plaintext inventory has duplicate or empty authoritative object IDs")
+    if authoritative_map != expected_authoritative:
+        raise ValueError("plaintext inventory authoritative paths or commitments changed")
+
+    matches = inventory.get("matching_plaintext")
+    if not isinstance(matches, list) or not matches:
+        raise ValueError("plaintext inventory has no matching plaintext records")
+    seen_paths = set()
+    match_keys = set()
+    for record in matches:
+        object_id = record.get("object_id")
+        path_text = record.get("path")
+        if object_id not in commitments or not isinstance(path_text, str):
+            raise ValueError("plaintext inventory contains an unknown object or path")
+        expected = commitments[object_id]
+        if record.get("bytes") != expected["bytes"] or record.get("sha256") != expected["sha256"]:
+            raise ValueError("plaintext inventory record differs from seal commitment")
+        path = Path(path_text)
+        if not path.is_absolute() or path_text != str(path.resolve()):
+            raise ValueError("plaintext inventory path is not absolute and normalized")
+        if not any(_path_is_within(path, root) for root in roots):
+            raise ValueError("plaintext inventory path is outside declared scan roots")
+        if path_text in seen_paths:
+            raise ValueError("plaintext inventory contains a duplicate physical path")
+        seen_paths.add(path_text)
+        match_keys.add((object_id, path_text))
+    for record in expected_authoritative.values():
+        if (record["object_id"], record["path"]) not in match_keys:
+            raise ValueError(f"authoritative plaintext is absent from inventory: {record['object_id']}")
+    return inventory, roots
+
+
+def _path_is_within(path, root):
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
 
 
 def validate_seal_commit(policy_path, code_commit, repository):
@@ -176,20 +238,28 @@ def verify_package(policy_path, run_dir, manifest_path, repository):
     }
 
 
-def verify_initial(policy_path, run_dir, manifest_path, replica_manifest_path, repository):
+def verify_initial(
+    policy_path, run_dir, manifest_path, replica_manifest_path, inventory_path, repository,
+):
     result = verify_package(policy_path, run_dir, manifest_path, repository)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     replica_count = validate_replicas(replica_manifest_path, manifest_path)
-    verify_inaccessible(plaintext_paths(run_dir))
-    roots = plaintext_scan_roots(repository, run_dir)
-    matches = find_matching_plaintext(roots, plaintext_commitments(manifest))
+    inventory, roots = validate_plaintext_inventory(inventory_path, manifest_path, run_dir, repository)
+    verify_absent(plaintext_paths(run_dir))
+    inventoried_paths = {
+        f"inventory:{index}": Path(record["path"])
+        for index, record in enumerate(inventory["matching_plaintext"], start=1)
+    }
+    verify_absent(inventoried_paths)
+    matches = find_matching_plaintext(roots, physical_plaintext_commitments(manifest))
     if matches:
         details = ", ".join(f"{item['object_id']}={item['path']}" for item in matches)
-        raise ValueError(f"protected plaintext hash remains readable in declared scan roots: {details}")
+        raise ValueError(f"protected plaintext hash remains in declared scan roots: {details}")
     result.update({
         "status": "public_timelock_seal_verified",
-        "plaintext_access_checked": True,
-        "protected_plaintext_readable": False,
+        "plaintext_removal_checked": True,
+        "protected_plaintext_paths_present": False,
+        "plaintext_inventory_sha256": digest(inventory_path),
         "plaintext_scan_roots": [str(path) for path in roots],
         "verified_replicas": replica_count,
     })
@@ -440,6 +510,7 @@ def main():
         command.add_argument("seal_manifest", type=Path)
         if name == "initial":
             command.add_argument("replica_manifest", type=Path)
+            command.add_argument("plaintext_inventory", type=Path)
         command.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[2])
     release = subparsers.add_parser("release")
     release.add_argument("stage", choices=("adaptation", "final_evaluation"))
@@ -460,6 +531,7 @@ def main():
         result = verify_initial(
             policy_path, args.run_directory.resolve(strict=True), args.seal_manifest.resolve(strict=True),
             args.replica_manifest.resolve(strict=True),
+            args.plaintext_inventory.resolve(strict=True),
             args.repository.resolve(strict=True),
         )
     else:
