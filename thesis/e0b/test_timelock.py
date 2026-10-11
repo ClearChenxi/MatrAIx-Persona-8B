@@ -438,25 +438,30 @@ class TimelockPolicyTests(unittest.TestCase):
             "schema_version": "1.0", "status": "registered",
             "T_campaigns": fixed["T_campaigns"], "pool_rows": fixed["pool_rows"],
             "campaign_pool_rows": fixed["campaign_pool_rows"],
+            "E1a_and_E1b_pool": fixed["E1a_and_E1b_pool"],
+            "E2_prediction_pool": fixed["E2_prediction_pool"],
+            "E2_activity_sets": fixed["E2_activity_sets"],
+            "E2_budget_sets": fixed["E2_budget_sets"],
+            "required_prediction_sets": fixed["required_prediction_sets"],
             "row_universe": fixed["row_universe"],
             "artifact_requirements": [
                 {
                     "artifact_id": "e1a-main", "prediction_set": "E1a", "method_id": "m1",
                     "variant_id": "main", "path": "predictions/e1a.csv", "prediction_column": "p_redeem",
-                    "pool": "all_T", "campaigns": fixed["T_campaigns"], "repetitions": 1,
-                    "adaptation_budget_per_campaign": 0, "expected_rows": 1714,
+                    "pool": "final_evaluation", "campaigns": fixed["T_campaigns"], "repetitions": 1,
+                    "adaptation_budget_per_campaign": 0, "expected_rows": 1386,
                 },
                 {
                     "artifact_id": "e1b-ablation", "prediction_set": "E1b", "method_id": "m1",
                     "variant_id": "ablation", "path": "predictions/e1b.csv", "prediction_column": "p_redeem",
-                    "pool": "all_T", "campaigns": fixed["T_campaigns"], "repetitions": 1,
-                    "adaptation_budget_per_campaign": 0, "expected_rows": 1714,
+                    "pool": "final_evaluation", "campaigns": fixed["T_campaigns"], "repetitions": 1,
+                    "adaptation_budget_per_campaign": 0, "expected_rows": 1386,
                 },
                 {
-                    "artifact_id": "e2-budget10", "prediction_set": "E2", "method_id": "m1",
-                    "variant_id": "budget10", "path": "predictions/e2.csv", "prediction_column": "p_redeem",
-                    "pool": "final_evaluation", "campaigns": [14], "repetitions": 1,
-                    "adaptation_budget_per_campaign": 10, "expected_rows": 188,
+                    "artifact_id": "e2-budget0", "prediction_set": "E2", "method_id": "m1",
+                    "variant_id": "budget0", "path": "predictions/e2.csv", "prediction_column": "p_redeem",
+                    "pool": "final_evaluation", "campaigns": fixed["E2_activity_sets"]["main"], "repetitions": 1,
+                    "adaptation_budget_per_campaign": 0, "expected_rows": 1325,
                 },
             ],
         }
@@ -464,9 +469,76 @@ class TimelockPolicyTests(unittest.TestCase):
             path = Path(directory) / "contract.json"
             path.write_text(json.dumps(contract), encoding="utf-8")
             validate_prediction_contract_file(path)
-            contract["artifact_requirements"][-1]["expected_rows"] = 187
+            contract["artifact_requirements"][-1]["expected_rows"] = 1324
             path.write_text(json.dumps(contract), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "E2 expected rows"):
+                validate_prediction_contract_file(path)
+
+    def test_prediction_contract_accepts_main_n10_and_sensitivity_n40(self):
+        source = Path(__file__).with_name("prediction-contract.json")
+        fixed = json.loads(source.read_text(encoding="utf-8"))
+        base = {
+            "schema_version": "1.0", "status": "registered",
+            "T_campaigns": fixed["T_campaigns"], "pool_rows": fixed["pool_rows"],
+            "campaign_pool_rows": fixed["campaign_pool_rows"],
+            "E1a_and_E1b_pool": fixed["E1a_and_E1b_pool"],
+            "E2_prediction_pool": fixed["E2_prediction_pool"],
+            "E2_activity_sets": fixed["E2_activity_sets"],
+            "E2_budget_sets": fixed["E2_budget_sets"],
+            "required_prediction_sets": fixed["required_prediction_sets"],
+            "row_universe": fixed["row_universe"],
+            "artifact_requirements": [
+                {
+                    "artifact_id": "e1a-main", "prediction_set": "E1a", "method_id": "m1",
+                    "variant_id": "main", "path": "predictions/e1a.csv", "prediction_column": "p_redeem",
+                    "pool": "final_evaluation", "campaigns": fixed["T_campaigns"], "repetitions": 1,
+                    "adaptation_budget_per_campaign": 0, "expected_rows": 1386,
+                },
+                {
+                    "artifact_id": "e1b-main", "prediction_set": "E1b", "method_id": "m2",
+                    "variant_id": "main", "path": "predictions/e1b.csv", "prediction_column": "p_redeem",
+                    "pool": "final_evaluation", "campaigns": fixed["T_campaigns"], "repetitions": 1,
+                    "adaptation_budget_per_campaign": 0, "expected_rows": 1386,
+                },
+                {
+                    "artifact_id": "e2-n10", "prediction_set": "E2", "method_id": "m3",
+                    "variant_id": "n10", "path": "predictions/e2-n10.csv", "prediction_column": "p_redeem",
+                    "pool": "final_evaluation", "campaigns": fixed["E2_activity_sets"]["main"], "repetitions": 1,
+                    "adaptation_budget_per_campaign": 10, "expected_rows": 1325,
+                },
+                {
+                    "artifact_id": "e2-n40", "prediction_set": "E2", "method_id": "m3",
+                    "variant_id": "n40", "path": "predictions/e2-n40.csv", "prediction_column": "p_redeem",
+                    "pool": "final_evaluation", "campaigns": fixed["E2_activity_sets"]["sensitivity_n40"], "repetitions": 1,
+                    "adaptation_budget_per_campaign": 40, "expected_rows": 706,
+                },
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "contract.json"
+            path.write_text(json.dumps(base), encoding="utf-8")
+            validate_prediction_contract_file(path)
+            base["artifact_requirements"][2]["campaigns"] = [14]
+            path.write_text(json.dumps(base), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "n=0/10/20"):
+                validate_prediction_contract_file(path)
+
+    def test_prediction_contract_rejects_legacy_e1_all_t_pool(self):
+        source = Path(__file__).with_name("prediction-contract.json")
+        fixed = json.loads(source.read_text(encoding="utf-8"))
+        contract = {
+            "schema_version": "1.0", "status": "registered",
+            "T_campaigns": fixed["T_campaigns"], "pool_rows": fixed["pool_rows"],
+            "campaign_pool_rows": fixed["campaign_pool_rows"],
+            "E1a_and_E1b_pool": "all_T", "E2_prediction_pool": fixed["E2_prediction_pool"],
+            "E2_activity_sets": fixed["E2_activity_sets"], "E2_budget_sets": fixed["E2_budget_sets"],
+            "required_prediction_sets": fixed["required_prediction_sets"],
+            "row_universe": fixed["row_universe"], "artifact_requirements": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "contract.json"
+            path.write_text(json.dumps(contract), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "E1a/E1b prediction pool"):
                 validate_prediction_contract_file(path)
 
     def test_prediction_contract_rejects_legacy_parent_e1_prediction_set(self):
@@ -476,6 +548,11 @@ class TimelockPolicyTests(unittest.TestCase):
             "schema_version": "1.0", "status": "registered",
             "T_campaigns": fixed["T_campaigns"], "pool_rows": fixed["pool_rows"],
             "campaign_pool_rows": fixed["campaign_pool_rows"],
+            "E1a_and_E1b_pool": fixed["E1a_and_E1b_pool"],
+            "E2_prediction_pool": fixed["E2_prediction_pool"],
+            "E2_activity_sets": fixed["E2_activity_sets"],
+            "E2_budget_sets": fixed["E2_budget_sets"],
+            "required_prediction_sets": fixed["required_prediction_sets"],
             "row_universe": fixed["row_universe"],
             "artifact_requirements": [{
                 "artifact_id": "legacy-e1", "prediction_set": "E1", "method_id": "m1",

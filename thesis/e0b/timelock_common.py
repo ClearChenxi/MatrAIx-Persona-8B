@@ -206,6 +206,23 @@ def validate_prediction_contract_file(path, repository=None):
     }
     if contract.get("campaign_pool_rows") != expected_campaign_rows:
         raise ValueError("prediction contract per-campaign pool sizes changed")
+    if contract.get("E1a_and_E1b_pool") != "final_evaluation":
+        raise ValueError("E1a/E1b prediction pool must be final_evaluation")
+    if contract.get("E2_prediction_pool") != "final_evaluation":
+        raise ValueError("E2 prediction pool must be final_evaluation")
+    if contract.get("required_prediction_sets") != ["E1a", "E1b", "E2"]:
+        raise ValueError("prediction contract required set inventory changed")
+    expected_e2_activity_sets = {
+        "main": [14, 16, 17, 19, 20, 22, 23, 25],
+        "sensitivity_n40": [20, 22, 23, 25],
+    }
+    if contract.get("E2_activity_sets") != expected_e2_activity_sets:
+        raise ValueError("E2 activity sets differ from the frozen protocol")
+    if contract.get("E2_budget_sets") != {
+        "main": [0, 10, 20],
+        "sensitivity_n40": [40],
+    }:
+        raise ValueError("E2 budget sets differ from the frozen protocol")
     expected_universe = {
         "path": "thesis/e1_data/runs/e1-data-20261011T042328.304949Z/private/links_T.csv",
         "sha256": "c4e2be2bfde72c2049cf8c78c824fedfbfe9212415ba0b35634c5407a9b9d9eb",
@@ -246,13 +263,21 @@ def validate_prediction_contract_file(path, repository=None):
             raise ValueError("prediction artifact repetitions and row count must be positive integers")
         budget = record.get("adaptation_budget_per_campaign")
         if prediction_set in {"E1a", "E1b"}:
-            if record.get("pool") != "all_T" or record_campaigns != campaigns or budget != 0:
-                raise ValueError("E1a/E1b artifacts must cover all T rows without adaptation labels")
-            if expected_rows != 1714 * repetitions:
-                raise ValueError("E1a/E1b expected rows must equal all T rows times repetitions")
+            if record.get("pool") != "final_evaluation" or record_campaigns != campaigns or budget != 0:
+                raise ValueError("E1a/E1b artifacts must cover the final evaluation pool without adaptation labels")
+            if expected_rows != 1386 * repetitions:
+                raise ValueError("E1a/E1b expected rows must equal final evaluation rows times repetitions")
         else:
-            if record.get("pool") != "final_evaluation" or not isinstance(budget, int) or budget < 1:
-                raise ValueError("E2 artifacts must declare a positive adaptation budget and final pool")
+            if record.get("pool") != "final_evaluation" or not isinstance(budget, int):
+                raise ValueError("E2 artifacts must declare an integer adaptation budget and final pool")
+            if budget in {0, 10, 20}:
+                if record_campaigns != expected_e2_activity_sets["main"]:
+                    raise ValueError("E2 n=0/10/20 artifacts must cover the eight main campaigns")
+            elif budget == 40:
+                if record_campaigns != expected_e2_activity_sets["sensitivity_n40"]:
+                    raise ValueError("E2 n=40 artifacts must cover the four sensitivity campaigns")
+            else:
+                raise ValueError("E2 adaptation budget is not registered")
             available = [expected_campaign_rows[str(campaign)]["adaptation"] for campaign in record_campaigns]
             if budget > min(available):
                 raise ValueError("E2 adaptation budget exceeds an included campaign pool")

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "status": "pending_protocol_freeze",
-  "reason": "Protocol v1.1 defines E1a prediction validity and E1b persona mechanisms. Machine policy now recognizes E1a/E1b/E2; D/R method development must still enumerate every artifact and freeze repetitions before this contract can be registered",
+  "reason": "Protocol v1.2 defines E1a prediction validity, E1b persona mechanisms, and mandatory E2 limited-label analysis. D/R method development must still enumerate every artifact and freeze repetitions before this contract can be registered",
   "T_campaigns": [14, 15, 16, 17, 19, 20, 21, 22, 23, 25],
   "pool_rows": {
     "adaptation": 328,
@@ -20,8 +20,16 @@
     "23": {"adaptation": 43, "final_evaluation": 140, "all_T": 183},
     "25": {"adaptation": 41, "final_evaluation": 146, "all_T": 187}
   },
-  "E1a_and_E1b_pool": "all_T",
+  "E1a_and_E1b_pool": "final_evaluation",
   "E2_prediction_pool": "final_evaluation",
+  "E2_activity_sets": {
+    "main": [14, 16, 17, 19, 20, 22, 23, 25],
+    "sensitivity_n40": [20, 22, 23, 25]
+  },
+  "E2_budget_sets": {
+    "main": [0, 10, 20],
+    "sensitivity_n40": [40]
+  },
   "required_prediction_sets": ["E1a", "E1b", "E2"],
   "row_universe": {
     "path": "thesis/e1_data/runs/e1-data-20261011T042328.304949Z/private/links_T.csv",
