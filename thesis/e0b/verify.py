@@ -5,12 +5,38 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import stat
 from pathlib import Path
 
 from audit import canonical_json, digest, validate_plan
 
 
+def permission_mode(path):
+    return stat.S_IMODE(path.stat(follow_symlinks=False).st_mode)
+
+
+def verify_private_permissions(run_dir):
+    private = run_dir / "private"
+    if private.is_symlink() or not private.is_dir():
+        raise ValueError("E0b private evidence directory is missing or is a symlink")
+    if permission_mode(private) != 0o700:
+        raise ValueError("E0b private evidence directory current mode is not 0o700")
+    private_files = sorted(private.rglob("*"))
+    if not private_files:
+        raise ValueError("E0b private evidence directory is empty")
+    for path in private_files:
+        if path.is_symlink():
+            raise ValueError("E0b private evidence contains a symlink")
+        if path.is_dir():
+            if permission_mode(path) != 0o700:
+                raise ValueError("E0b nested private directory current mode is not 0o700")
+        elif not path.is_file() or permission_mode(path) != 0o600:
+            raise ValueError("E0b private file current mode is not 0o600")
+    return sum(path.is_file() for path in private_files)
+
+
 def verify(run_dir):
+    private_file_count = verify_private_permissions(run_dir)
     plan = json.loads((run_dir / "plan.json").read_text(encoding="utf-8"))
     validate_plan(plan)
     checksums = json.loads((run_dir / "checksums.json").read_text(encoding="utf-8"))
@@ -36,7 +62,7 @@ def verify(run_dir):
         if seal["historical_label_summary"][split]["rows"] != seal["eligible_rows_by_split"][split]:
             raise ValueError(f"public {split} label summary row count is inconsistent")
     if seal["test_file_mode"] != "0o600":
-        raise ValueError("T label file is not owner-only")
+        raise ValueError("recorded T label file mode is not owner-only")
     if flow["e2"]["labels_used_for_assignment"]:
         raise ValueError("E2 household assignment used labels")
     if len(activities["activities"]) != sum(len(value) for value in plan["splits"].values()):
@@ -74,6 +100,7 @@ def verify(run_dir):
     return {
         "status": "verified",
         "verified_files": len(actual),
+        "private_files_with_current_mode_verified": private_file_count,
         "source_files": manifest["source_files"],
         "source_rows": manifest["source_rows"],
         "activities": len(activities["activities"]),

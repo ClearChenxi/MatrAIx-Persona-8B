@@ -11,6 +11,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from audit import run_audit
+from lock_sources import lock_sources
 from seal_labels import seal
 from verify import verify
 
@@ -167,6 +168,33 @@ class E0bAuditTests(unittest.TestCase):
         latest = max(feasibility["activities"], key=lambda item: item["end_day"])
         self.assertFalse(latest["outcome_source_complete"])
         self.assertIn("outcome_source_incomplete", latest["exclusion_reasons"])
+
+    def test_verifier_rejects_current_private_permission_drift(self):
+        run_dir = self.root / "permission-drift"
+        run_audit(self.plan, run_dir, require_repository=False)
+        seal(self.plan, run_dir)
+        private_file = run_dir / "private/labels_T_SEALED.csv"
+        private_file.chmod(0o644)
+        with self.assertRaisesRegex(ValueError, "private file current mode"):
+            verify(run_dir)
+        private_file.chmod(0o600)
+        (run_dir / "private").chmod(0o755)
+        with self.assertRaisesRegex(ValueError, "directory current mode"):
+            verify(run_dir)
+
+    def test_registered_sources_are_hash_checked_and_made_read_only(self):
+        run_dir = self.root / "source-lock"
+        run_audit(self.plan, run_dir, require_repository=False)
+        planned = lock_sources(run_dir)
+        self.assertEqual(planned["status"], "plan_only")
+        self.assertFalse(planned["permissions_changed"])
+        result = lock_sources(run_dir, execute=True)
+        self.assertEqual(result["status"], "source_permissions_hardened")
+        self.assertEqual(result["registered_objects"], 9)
+        registry = json.loads((run_dir / "public/source_manifest.json").read_text())
+        source_paths = [Path(record["local_path"]) for record in registry.values()]
+        source_paths.append(Path(self.plan["dataset_source"]["local_archive"]))
+        self.assertTrue(all(path.stat().st_mode & 0o777 == 0o444 for path in source_paths))
 
     def test_time_permission_overlap_is_rejected(self):
         path = self.data / "campaign_desc.csv"

@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "status": "required_before_formal_T_prediction",
+  "purpose": "independent custody of T outcomes and every locally accessible source that can reconstruct them",
+  "custodian_requirements": {
+    "independent_person_or_system_account": true,
+    "executor_must_not_hold_decryption_key": true,
+    "signed_receipt_required": true,
+    "release_condition": "all frozen E1/E1a predictions and any approved E2 predictions have been committed, pushed, and hash-registered"
+  },
+  "protected_objects": [
+    {
+      "id": "sealed_T_labels",
+      "source": "e0b_private",
+      "relative_path": "private/labels_T_SEALED.csv",
+      "commitment_field": "sealed_files.labels_T_SEALED.csv"
+    },
+    {
+      "id": "private_label_summary",
+      "source": "e0b_private",
+      "relative_path": "private/label_summary_PRIVATE.json",
+      "commitment_field": "private_summary_sha256"
+    },
+    {
+      "id": "redemption_source",
+      "source": "source_manifest",
+      "table": "coupon_redempt.csv",
+      "reason": "can reconstruct primary Y1"
+    },
+    {
+      "id": "transaction_source",
+      "source": "source_manifest",
+      "table": "transaction_data.csv",
+      "reason": "can reconstruct auxiliary Y2"
+    },
+    {
+      "id": "original_archive",
+      "source": "dataset_source",
+      "path_field": "local_archive",
+      "commitment_field": "archive_sha256",
+      "reason": "can restore all outcome sources"
+    }
+  ],
+  "receipt_required_fields": [
+    "schema_version",
+    "status",
+    "custodian_name",
+    "custodian_role",
+    "accepted_at",
+    "custodian_signing_key_fingerprint",
+    "executor_has_decryption_key",
+    "release_condition",
+    "objects"
+  ]
+}

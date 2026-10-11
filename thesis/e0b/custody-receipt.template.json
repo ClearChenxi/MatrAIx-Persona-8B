@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "status": "accepted_by_independent_custodian",
+  "custodian_name": "REPLACE_WITH_CUSTODIAN_NAME",
+  "custodian_role": "REPLACE_WITH_CUSTODIAN_ROLE",
+  "accepted_at": "REPLACE_WITH_ISO_8601_TIME",
+  "custodian_signing_key_fingerprint": "REPLACE_WITH_FULL_GPG_FINGERPRINT",
+  "executor_has_decryption_key": false,
+  "release_condition": "all frozen E1/E1a predictions and any approved E2 predictions have been committed, pushed, and hash-registered",
+  "objects": {
+    "sealed_T_labels": {
+      "sha256": "2c73a445800dd1d9f577c61d92225ad1474a7d93de14818722ea9b853e959ed4",
+      "accepted": true
+    },
+    "private_label_summary": {
+      "sha256": "412ed12e7967f0c8602bf1c2a825a6abe53e2b1cb287972a18232ddaa01ae2f3",
+      "accepted": true
+    },
+    "redemption_source": {
+      "sha256": "70a98f3bfb28be0dd850f19c8d806d2a23e44014546651367b21538db6fba1f8",
+      "accepted": true
+    },
+    "transaction_source": {
+      "sha256": "3a685c0729cef664d634486189f774518b84f53cde7cbf701a5963238692b476",
+      "accepted": true
+    },
+    "original_archive": {
+      "sha256": "5e0a3d72fe8562fe0ab995f70fb58b74359e8ec4bbccd1521e2b137da0558f9a",
+      "accepted": true
+    }
+  }
+}
