@@ -15,6 +15,7 @@
 ```sh
 .venv/bin/python thesis/e1_data/build.py --execute
 .venv/bin/python thesis/e1_data/verify.py thesis/e1_data/runs/e1-data-<timestamp>
+.venv/bin/python thesis/e1_data/audit_sample.py thesis/e1_data/runs/e1-data-<timestamp>
 ```
 
 运行目录包含真实家庭连接和行为特征，整体由Git忽略且私有文件权限为`0600`。Git只跟踪代码、冻结规则和不含家庭ID/T结果的聚合验收报告。
