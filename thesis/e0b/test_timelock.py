@@ -92,16 +92,16 @@ def pending_policy():
         "release_stages": {
             "adaptation": {
                 "authorized_objects": ["T_adaptation_labels"],
-                "condition_id": "E1_E1a_predictions_frozen",
-                "required_prediction_sets": ["E1", "E1a"],
+                "condition_id": "E1a_E1b_predictions_frozen",
+                "required_prediction_sets": ["E1a", "E1b"],
             },
             "final_evaluation": {
                 "authorized_objects": [
                     "T_final_evaluation_labels", "private_label_summary", "redemption_source",
                     "transaction_source", "original_archive",
                 ],
-                "condition_id": "E1_E1a_E2_predictions_frozen",
-                "required_prediction_sets": ["E1", "E1a", "E2"],
+                "condition_id": "E1a_E1b_E2_predictions_frozen",
+                "required_prediction_sets": ["E1a", "E1b", "E2"],
             },
         },
         "plaintext_paths_that_must_not_exist_after_seal": [
@@ -180,7 +180,7 @@ class TimelockPolicyTests(unittest.TestCase):
 
     def test_release_inventory_cannot_omit_e2_or_final_sources(self):
         policy = pending_policy()
-        policy["release_stages"]["final_evaluation"]["required_prediction_sets"] = ["E1", "E1a"]
+        policy["release_stages"]["final_evaluation"]["required_prediction_sets"] = ["E1a", "E1b"]
         with self.assertRaisesRegex(ValueError, "release rules changed"):
             validate_policy(policy, require_schedule=False)
 
@@ -441,14 +441,14 @@ class TimelockPolicyTests(unittest.TestCase):
             "row_universe": fixed["row_universe"],
             "artifact_requirements": [
                 {
-                    "artifact_id": "e1-main", "prediction_set": "E1", "method_id": "m1",
-                    "variant_id": "main", "path": "predictions/e1.csv", "prediction_column": "p_redeem",
+                    "artifact_id": "e1a-main", "prediction_set": "E1a", "method_id": "m1",
+                    "variant_id": "main", "path": "predictions/e1a.csv", "prediction_column": "p_redeem",
                     "pool": "all_T", "campaigns": fixed["T_campaigns"], "repetitions": 1,
                     "adaptation_budget_per_campaign": 0, "expected_rows": 1714,
                 },
                 {
-                    "artifact_id": "e1a-ablation", "prediction_set": "E1a", "method_id": "m1",
-                    "variant_id": "ablation", "path": "predictions/e1a.csv", "prediction_column": "p_redeem",
+                    "artifact_id": "e1b-ablation", "prediction_set": "E1b", "method_id": "m1",
+                    "variant_id": "ablation", "path": "predictions/e1b.csv", "prediction_column": "p_redeem",
                     "pool": "all_T", "campaigns": fixed["T_campaigns"], "repetitions": 1,
                     "adaptation_budget_per_campaign": 0, "expected_rows": 1714,
                 },
@@ -467,6 +467,28 @@ class TimelockPolicyTests(unittest.TestCase):
             contract["artifact_requirements"][-1]["expected_rows"] = 187
             path.write_text(json.dumps(contract), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "E2 expected rows"):
+                validate_prediction_contract_file(path)
+
+    def test_prediction_contract_rejects_legacy_parent_e1_prediction_set(self):
+        source = Path(__file__).with_name("prediction-contract.json")
+        fixed = json.loads(source.read_text(encoding="utf-8"))
+        contract = {
+            "schema_version": "1.0", "status": "registered",
+            "T_campaigns": fixed["T_campaigns"], "pool_rows": fixed["pool_rows"],
+            "campaign_pool_rows": fixed["campaign_pool_rows"],
+            "row_universe": fixed["row_universe"],
+            "artifact_requirements": [{
+                "artifact_id": "legacy-e1", "prediction_set": "E1", "method_id": "m1",
+                "variant_id": "main", "path": "predictions/legacy.csv",
+                "prediction_column": "p_redeem", "pool": "all_T",
+                "campaigns": fixed["T_campaigns"], "repetitions": 1,
+                "adaptation_budget_per_campaign": 0, "expected_rows": 1714,
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "contract.json"
+            path.write_text(json.dumps(contract), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unknown prediction set"):
                 validate_prediction_contract_file(path)
 
     def test_verify_cli_routes_replica_and_inventory_manifests_to_initial(self):

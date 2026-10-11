@@ -271,7 +271,7 @@ def run_audit(plan, run_dir, require_repository=True):
     permissions = {
         "D": "development labels may be used for field, prompt, model, and anomaly-rule development",
         "R": "validation labels may be used only for frozen-candidate selection, calibration, and stability checks",
-        "T": "labels and response summaries remain sealed until all E1/E1a predictions and policies are frozen",
+        "T": "labels and response summaries remain sealed until all E1a/E1b predictions and policies are frozen",
     }
     for split in ("D", "R", "T"):
         for campaign in plan["splits"][split]:

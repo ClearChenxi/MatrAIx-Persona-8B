@@ -1,15 +1,15 @@
 {
   "schema_version": "3.0",
-  "status": "E1_E1a_E2_predictions_frozen",
+  "status": "E1a_E1b_E2_predictions_frozen",
   "frozen_at_utc": "REPLACE_WITH_ISO_8601_UTC_TIME",
   "code_commit": "REPLACE_WITH_PUSHED_CODE_COMMIT",
   "code_committed_and_pushed": true,
   "timelock_seal_manifest_sha256": "REPLACE_WITH_TIMELOCK_SEAL_MANIFEST_SHA256",
   "prediction_contract_sha256": "REPLACE_WITH_REGISTERED_PREDICTION_CONTRACT_SHA256",
-  "prediction_sets": ["E1", "E1a", "E2"],
+  "prediction_sets": ["E1a", "E1b", "E2"],
   "artifacts": [
     {
-      "artifact_id": "REPLACE_WITH_EACH_CONTRACT_E1_E1A_OR_E2_ARTIFACT_ID",
+      "artifact_id": "REPLACE_WITH_EACH_CONTRACT_E1A_E1B_OR_E2_ARTIFACT_ID",
       "path": "REPLACE_WITH_EXACT_CONTRACT_PATH",
       "sha256": "REPLACE_WITH_SHA256"
     }

@@ -107,8 +107,8 @@
   "release_stages": {
     "adaptation": {
       "authorized_objects": ["T_adaptation_labels"],
-      "condition_id": "E1_E1a_predictions_frozen",
-      "required_prediction_sets": ["E1", "E1a"]
+      "condition_id": "E1a_E1b_predictions_frozen",
+      "required_prediction_sets": ["E1a", "E1b"]
     },
     "final_evaluation": {
       "authorized_objects": [
@@ -118,8 +118,8 @@
         "transaction_source",
         "original_archive"
       ],
-      "condition_id": "E1_E1a_E2_predictions_frozen",
-      "required_prediction_sets": ["E1", "E1a", "E2"]
+      "condition_id": "E1a_E1b_E2_predictions_frozen",
+      "required_prediction_sets": ["E1a", "E1b", "E2"]
     }
   },
   "plaintext_paths_that_must_not_exist_after_seal": [

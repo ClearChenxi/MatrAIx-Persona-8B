@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Attest E1 prediction freeze
+      - name: Attest E1a and E1b prediction freeze
         if: ${{ hashFiles('thesis/e0b/freezes/e1-freeze-manifest.json') != '' }}
         uses: actions/attest-build-provenance@v3
         with:

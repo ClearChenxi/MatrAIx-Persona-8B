@@ -90,16 +90,16 @@ def validate_policy(policy, require_schedule=True):
     expected_release = {
         "adaptation": {
             "authorized_objects": ["T_adaptation_labels"],
-            "condition_id": "E1_E1a_predictions_frozen",
-            "required_prediction_sets": ["E1", "E1a"],
+            "condition_id": "E1a_E1b_predictions_frozen",
+            "required_prediction_sets": ["E1a", "E1b"],
         },
         "final_evaluation": {
             "authorized_objects": [
                 "T_final_evaluation_labels", "private_label_summary", "redemption_source",
                 "transaction_source", "original_archive",
             ],
-            "condition_id": "E1_E1a_E2_predictions_frozen",
-            "required_prediction_sets": ["E1", "E1a", "E2"],
+            "condition_id": "E1a_E1b_E2_predictions_frozen",
+            "required_prediction_sets": ["E1a", "E1b", "E2"],
         },
     }
     if policy.get("release_stages") != expected_release:
@@ -227,7 +227,7 @@ def validate_prediction_contract_file(path, repository=None):
     for record in artifacts:
         prediction_set = record.get("prediction_set")
         covered_sets.add(prediction_set)
-        if prediction_set not in {"E1", "E1a", "E2"}:
+        if prediction_set not in {"E1a", "E1b", "E2"}:
             raise ValueError("prediction contract contains an unknown prediction set")
         if not all(isinstance(record.get(key), str) and record[key] for key in ("method_id", "variant_id", "path", "prediction_column")):
             raise ValueError("prediction contract method, variant, and path must be explicit")
@@ -245,11 +245,11 @@ def validate_prediction_contract_file(path, repository=None):
         if not isinstance(repetitions, int) or repetitions < 1 or not isinstance(expected_rows, int) or expected_rows < 1:
             raise ValueError("prediction artifact repetitions and row count must be positive integers")
         budget = record.get("adaptation_budget_per_campaign")
-        if prediction_set in {"E1", "E1a"}:
+        if prediction_set in {"E1a", "E1b"}:
             if record.get("pool") != "all_T" or record_campaigns != campaigns or budget != 0:
-                raise ValueError("E1/E1a artifacts must cover all T rows without adaptation labels")
+                raise ValueError("E1a/E1b artifacts must cover all T rows without adaptation labels")
             if expected_rows != 1714 * repetitions:
-                raise ValueError("E1/E1a expected rows must equal all T rows times repetitions")
+                raise ValueError("E1a/E1b expected rows must equal all T rows times repetitions")
         else:
             if record.get("pool") != "final_evaluation" or not isinstance(budget, int) or budget < 1:
                 raise ValueError("E2 artifacts must declare a positive adaptation budget and final pool")
@@ -261,8 +261,8 @@ def validate_prediction_contract_file(path, repository=None):
             ) * repetitions
             if expected_rows != expected:
                 raise ValueError("E2 expected rows do not equal registered campaign pools times repetitions")
-    if covered_sets != {"E1", "E1a", "E2"}:
-        raise ValueError("prediction contract must fully enumerate E1, E1a, and E2")
+    if covered_sets != {"E1a", "E1b", "E2"}:
+        raise ValueError("prediction contract must fully enumerate E1a, E1b, and E2")
     return contract
 
 
