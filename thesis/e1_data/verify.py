@@ -7,6 +7,7 @@ import csv
 import json
 import os
 import sys
+from math import isclose
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -40,6 +41,8 @@ def verify(run_dir):
         raise ValueError("prepared data manifest is not safely complete")
     if manifest["excluded_sources_opened"] or manifest["labels_written"] != ["D", "R"]:
         raise ValueError("source or label permissions were violated")
+    if manifest["model_payloads_include_identifiers"]:
+        raise ValueError("model payload identifier policy was violated")
     if set(dictionary["forbidden_model_fields"]) & set(BASE_FEATURE_FIELDS):
         raise ValueError("forbidden field entered the model feature table")
 
@@ -58,13 +61,20 @@ def verify(run_dir):
             raise ValueError(f"row identity mismatch for {split}")
         if len(rows[split]) != manifest["rows"][split]:
             raise ValueError(f"row count mismatch for {split}")
-        with (run_dir / f"private/model_inputs_{split}.jsonl").open("r", encoding="utf-8") as stream:
-            inputs = [line for line in stream if line.strip()]
-        if len(inputs) != len(rows[split]):
-            raise ValueError(f"model input count mismatch for {split}")
-        if any('"household_key"' in line or '"campaign_id"' in line for line in inputs):
-            raise ValueError(f"identifier exposed in {split} model input")
+        _, index_rows = csv_rows(run_dir / f"private/model_payload_index_{split}.csv")
+        with (run_dir / f"private/model_payloads_{split}.jsonl").open("r", encoding="utf-8") as stream:
+            payloads = [json.loads(line) for line in stream if line.strip()]
+        if len(payloads) != len(rows[split]) or [row["row_id"] for row in index_rows] != feature_ids:
+            raise ValueError(f"model payload/index mismatch for {split}")
+        if [int(row["line_number"]) for row in index_rows] != list(range(1, len(index_rows) + 1)):
+            raise ValueError(f"model payload line numbers are not contiguous for {split}")
+        serialized_payloads = [json.dumps(payload, ensure_ascii=False, sort_keys=True) for payload in payloads]
+        if any(any(token in payload for token in ('"row_id"', '"household_key"', '"campaign_id"', '"e2_role"'))
+               for payload in serialized_payloads):
+            raise ValueError(f"identifier or permission exposed in {split} model payload")
         for row in rows[split]:
+            if not 1 <= int(row["recency_days"]) <= 84:
+                raise ValueError(f"purchase recency outside the 84-day history window in {split}")
             for field in ("retail_discount_basket_share", "coupon_discount_basket_share",
                           "target_product_sales_share", "target_commodity_sales_share"):
                 if row[field] == "":
@@ -74,6 +84,27 @@ def verify(run_dir):
                 value = float(row[field])
                 if not 0 <= value <= 1:
                     raise ValueError(f"share outside [0,1] in {split}: {field}")
+            for field in ("department_spend_shares_json", "brand_type_spend_shares_json",
+                          "campaign_department_weights_json", "campaign_brand_type_weights_json"):
+                values = [float(value) for value in json.loads(row[field]).values() if value != ""]
+                if values and not isclose(sum(values), 1.0, abs_tol=0.0001):
+                    raise ValueError(f"share map does not sum to one in {split}: {field}")
+            household_commodity = sum(float(row[f"top_commodity_{i}_share"] or 0) for i in range(1, 4))
+            household_commodity += float(row["other_commodity_share"] or 0)
+            if row["zero_sales_total_flag"] == "0" and not isclose(household_commodity, 1.0, abs_tol=0.00001):
+                raise ValueError(f"household commodity shares do not sum to one in {split}")
+            campaign_commodity = sum(float(row[f"campaign_top_commodity_{i}_weight"] or 0) for i in range(1, 9))
+            campaign_commodity += float(row["campaign_other_commodity_weight"] or 0)
+            if not isclose(campaign_commodity, 1.0, abs_tol=0.00001):
+                raise ValueError(f"campaign commodity weights do not sum to one in {split}")
+            no_prior = row["no_prior_campaign_flag"] == "1"
+            if no_prior != (row["prior_completed_campaign_count"] == "0" and row["prior_redemption_rate"] == ""):
+                raise ValueError(f"prior campaign missing flag is inconsistent in {split}")
+            no_target = row["no_target_product_purchase_flag"] == "1"
+            if no_target != (row["target_product_recency_days"] == ""):
+                raise ValueError(f"target purchase missing flag is inconsistent in {split}")
+            if not no_target and not 1 <= int(row["target_product_recency_days"]) <= 84:
+                raise ValueError(f"target recency outside the 84-day history window in {split}")
     for split in ("D", "R"):
         _, label_rows = csv_rows(run_dir / f"private/labels_{split}.csv")
         if [row["row_id"] for row in label_rows] != [row["row_id"] for row in rows[split]]:

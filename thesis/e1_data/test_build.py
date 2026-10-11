@@ -74,6 +74,8 @@ class E1DataUnitTests(unittest.TestCase):
             "campaign_other_commodity_weight": "0.000000",
         })
         rendered = json.dumps(persona_input(row), ensure_ascii=False)
+        self.assertNotIn("opaque", rendered)
+        self.assertNotIn("row_id", rendered)
         self.assertNotIn("household_key", rendered)
         self.assertNotIn("campaign_id", rendered)
         self.assertNotIn("y1_redeemed", rendered)

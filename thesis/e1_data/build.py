@@ -299,7 +299,6 @@ def persona_input(row):
         for i in range(1, 9) if row[f"campaign_top_commodity_{i}"]
     ]
     return {
-        "row_id": row["row_id"],
         "observed_household": {
             "observation_window_days": int(row["history_window_days"]),
             "days_since_last_positive_purchase": int(row["recency_days"]),
@@ -650,7 +649,11 @@ def build(plan, output, require_repository=True):
         write_csv(private / f"links_{split}.csv",
                   ["row_id", "household_key", "campaign", "split", "e2_role", "history_lower_day", "history_upper_day"],
                   links_by_split[split])
-        write_jsonl(private / f"model_inputs_{split}.jsonl", [persona_input(row) for row in rows_by_split[split]])
+        write_jsonl(private / f"model_payloads_{split}.jsonl", [persona_input(row) for row in rows_by_split[split]])
+        write_csv(private / f"model_payload_index_{split}.csv", ["line_number", "row_id"], [
+            {"line_number": index, "row_id": row["row_id"]}
+            for index, row in enumerate(rows_by_split[split], 1)
+        ])
         if split in labels_by_split:
             labels_by_split[split].sort(key=lambda row: row["row_id"])
             write_csv(private / f"labels_{split}.csv",
@@ -725,11 +728,13 @@ def build(plan, output, require_repository=True):
         "labels_written": ["D", "R"],
         "test_labels_opened": False,
         "test_labels_written": False,
+        "model_payloads_include_identifiers": False,
         "excluded_sources_opened": [],
         "source_tables_opened": list(RAW_TABLES),
         "permitted_e0b_private_inputs": ["cohort_permissions.csv", "labels_D_development.csv", "labels_R_validation.csv"],
         "model_calls": 0,
         "manual_audit_sample_rows": len(sample),
+        "history_response_feature_scope": "E0b-eligible completed D/R household-campaign labels only; five E0b-ineligible historical units are not imputed",
     }
     write_json(public / "manifest.json", manifest)
     current = {name: digest(path) for name, path in paths.items()}
