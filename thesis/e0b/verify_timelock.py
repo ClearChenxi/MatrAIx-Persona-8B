@@ -3,17 +3,27 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
+import csv
 import json
+import math
+import shutil
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 from audit import canonical_json, digest
 from timelock_common import (
     COMMIT, EXPECTED_BRANCH, SHA256, fetch_beacon_state, object_rules,
-    parse_ciphertext_identity, parse_utc, plaintext_paths, run_git,
-    source_commitments, validate_policy, verify_inaccessible,
+    find_matching_plaintext, parse_ciphertext_identity, parse_utc, plaintext_paths,
+    plaintext_scan_roots, run_git, source_commitments, validate_policy, verify_inaccessible,
+    validate_prediction_contract_file,
+)
+
+
+GITHUB_REPOSITORY = "ClearChenxi/MatrAIx-Persona-8B"
+ATTESTATION_WORKFLOW = (
+    "github.com/ClearChenxi/MatrAIx-Persona-8B/.github/workflows/attest-prediction-freeze.yml"
 )
 
 
@@ -59,6 +69,8 @@ def validate_seal_manifest(policy, policy_path, run_dir, manifest, manifest_dir)
         if object_id in policy["logical_label_objects"]:
             if record.get("source_parent_sha256") != parent_sha or record.get("e2_role") != rule["e2_role"]:
                 raise ValueError(f"logical label source or role mismatch: {object_id}")
+            if not isinstance(record.get("source_parent_bytes"), int) or record["source_parent_bytes"] < 1:
+                raise ValueError(f"logical label source byte count missing: {object_id}")
             if record.get("rows") != rule["expected_rows"]:
                 raise ValueError(f"logical label row count mismatch: {object_id}")
             total_rows += record["rows"]
@@ -66,6 +78,8 @@ def validate_seal_manifest(policy, policy_path, run_dir, manifest, manifest_dir)
             raise ValueError(f"protected source commitment mismatch: {object_id}")
         if not SHA256.fullmatch(record.get("plaintext_sha256") or ""):
             raise ValueError(f"plaintext commitment missing: {object_id}")
+        if not isinstance(record.get("plaintext_bytes"), int) or record["plaintext_bytes"] < 1:
+            raise ValueError(f"plaintext byte count missing: {object_id}")
         ciphertext = (manifest_dir / record.get("ciphertext_file", "")).resolve()
         if ciphertext.parent != manifest_dir.resolve() or not ciphertext.is_file() or ciphertext.is_symlink():
             raise ValueError(f"timelock ciphertext is missing or unsafe: {object_id}")
@@ -77,6 +91,58 @@ def validate_seal_manifest(policy, policy_path, run_dir, manifest, manifest_dir)
     if total_rows != 1714:
         raise ValueError("logical label partitions do not cover the frozen T row count")
     return timelock
+
+
+def validate_replicas(replica_manifest_path, seal_manifest_path):
+    replica_manifest = json.loads(replica_manifest_path.read_text(encoding="utf-8"))
+    if replica_manifest.get("schema_version") != "1.0" or replica_manifest.get("status") != "two_replicas_verified":
+        raise ValueError("invalid timelock replica manifest identity")
+    if replica_manifest.get("timelock_seal_manifest_sha256") != digest(seal_manifest_path):
+        raise ValueError("replicas point to a different timelock seal")
+    seal = json.loads(seal_manifest_path.read_text(encoding="utf-8"))
+    expected = {seal_manifest_path.name: digest(seal_manifest_path)}
+    expected.update({record["ciphertext_file"]: record["ciphertext_sha256"] for record in seal["objects"].values()})
+    replicas = replica_manifest.get("replicas")
+    if not isinstance(replicas, list) or len(replicas) < 2:
+        raise ValueError("at least two timelock replicas are required")
+    replica_ids = {record.get("replica_id") for record in replicas}
+    locations = {record.get("storage_location_id") for record in replicas}
+    if None in replica_ids or len(replica_ids) != len(replicas):
+        raise ValueError("timelock replica IDs must be nonempty and unique")
+    if None in locations or len(locations) != len(replicas):
+        raise ValueError("timelock replica storage locations must be nonempty and distinct")
+    directories = set()
+    with tempfile.TemporaryDirectory() as recovery_directory:
+        recovery_root = Path(recovery_directory)
+        for record in replicas:
+            directory = Path(record.get("directory", "")).resolve(strict=True)
+            if directory in directories:
+                raise ValueError("timelock replicas resolve to the same directory")
+            directories.add(directory)
+            if record.get("files") != expected or record.get("restoration_test_passed") is not True:
+                raise ValueError("timelock replica inventory or restoration declaration differs")
+            for name, checksum in expected.items():
+                source = (directory / name).resolve(strict=True)
+                if source.parent != directory or not source.is_file() or source.is_symlink():
+                    raise ValueError(f"timelock replica file is missing or unsafe: {name}")
+                recovered = recovery_root / f"{record['replica_id']}-{name}"
+                shutil.copyfile(source, recovered)
+                if digest(recovered) != checksum:
+                    raise ValueError(f"timelock replica restoration checksum mismatch: {name}")
+    return len(replicas)
+
+
+def plaintext_commitments(manifest):
+    commitments = {
+        object_id: {"sha256": record["plaintext_sha256"], "bytes": record["plaintext_bytes"]}
+        for object_id, record in manifest["objects"].items()
+    }
+    label = manifest["objects"]["T_adaptation_labels"]
+    commitments["sealed_T_labels_parent"] = {
+        "sha256": label["source_parent_sha256"],
+        "bytes": label["source_parent_bytes"],
+    }
+    return commitments
 
 
 def validate_seal_commit(policy_path, code_commit, repository):
@@ -110,43 +176,199 @@ def verify_package(policy_path, run_dir, manifest_path, repository):
     }
 
 
-def verify_initial(policy_path, run_dir, manifest_path, repository):
+def verify_initial(policy_path, run_dir, manifest_path, replica_manifest_path, repository):
     result = verify_package(policy_path, run_dir, manifest_path, repository)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    replica_count = validate_replicas(replica_manifest_path, manifest_path)
     verify_inaccessible(plaintext_paths(run_dir))
+    roots = plaintext_scan_roots(repository, run_dir)
+    matches = find_matching_plaintext(roots, plaintext_commitments(manifest))
+    if matches:
+        details = ", ".join(f"{item['object_id']}={item['path']}" for item in matches)
+        raise ValueError(f"protected plaintext hash remains readable in declared scan roots: {details}")
     result.update({
         "status": "public_timelock_seal_verified",
         "plaintext_access_checked": True,
         "protected_plaintext_readable": False,
+        "plaintext_scan_roots": [str(path) for path in roots],
+        "verified_replicas": replica_count,
     })
     return result
+
+
+def load_prediction_universe(repository_root, contract):
+    repository_root = repository_root.resolve(strict=True)
+    record = contract["row_universe"]
+    path = (repository_root / record["path"]).resolve(strict=True)
+    if digest(path) != record["sha256"]:
+        raise ValueError("prediction row universe differs from registered contract")
+    rows = []
+    seen = set()
+    counts = {}
+    with path.open("r", encoding="utf-8", newline="") as stream:
+        reader = csv.DictReader(stream)
+        if not {"row_id", "campaign", "e2_role"} <= set(reader.fieldnames or []):
+            raise ValueError("prediction row universe schema is incomplete")
+        for row in reader:
+            try:
+                campaign = int(row["campaign"])
+            except ValueError as error:
+                raise ValueError("prediction row universe campaign is invalid") from error
+            role = row["e2_role"]
+            key = (row["row_id"], campaign)
+            if not key[0] or key in seen or role not in {"adaptation", "final_evaluation"}:
+                raise ValueError("prediction row universe has a duplicate, empty, or invalid row")
+            seen.add(key)
+            rows.append((key[0], campaign, role))
+            counts.setdefault(str(campaign), {"adaptation": 0, "final_evaluation": 0, "all_T": 0})
+            counts[str(campaign)][role] += 1
+            counts[str(campaign)]["all_T"] += 1
+    if counts != contract["campaign_pool_rows"] or len(rows) != contract["pool_rows"]["all_T"]:
+        raise ValueError("prediction row universe counts differ from registered contract")
+    return rows
+
+
+def validate_prediction_artifact(repository_root, requirement, expected_digest, universe):
+    repository_root = repository_root.resolve(strict=True)
+    candidate = (repository_root / requirement["path"]).resolve(strict=True)
+    try:
+        candidate.relative_to(repository_root)
+    except ValueError as error:
+        raise ValueError("prediction artifact escapes the repository") from error
+    if not candidate.is_file() or candidate.is_symlink():
+        raise ValueError("prediction artifact is missing, unsafe, or not a regular file")
+    if digest(candidate) != expected_digest:
+        raise ValueError(f"prediction artifact commitment mismatch: {requirement['artifact_id']}")
+    with candidate.open("r", encoding="utf-8", newline="") as stream:
+        reader = csv.DictReader(stream)
+        required = {"row_id", "campaign", "method_id", "variant_id", "repetition", requirement["prediction_column"]}
+        if not required <= set(reader.fieldnames or []):
+            raise ValueError(f"prediction artifact schema is incomplete: {requirement['artifact_id']}")
+        count = 0
+        keys = set()
+        for row in reader:
+            count += 1
+            try:
+                campaign = int(row["campaign"])
+                repetition = int(row["repetition"])
+                score = float(row[requirement["prediction_column"]])
+            except (TypeError, ValueError) as error:
+                raise ValueError(f"prediction artifact contains an invalid typed value: {requirement['artifact_id']}") from error
+            if campaign not in requirement["campaigns"]:
+                raise ValueError(f"prediction artifact contains an undeclared campaign: {requirement['artifact_id']}")
+            if row["method_id"] != requirement["method_id"] or row["variant_id"] != requirement["variant_id"]:
+                raise ValueError(f"prediction artifact method or variant differs from contract: {requirement['artifact_id']}")
+            if repetition < 1 or repetition > requirement["repetitions"]:
+                raise ValueError(f"prediction artifact repetition differs from contract: {requirement['artifact_id']}")
+            if not math.isfinite(score) or score < 0 or score > 1:
+                raise ValueError(f"prediction artifact score is outside [0,1]: {requirement['artifact_id']}")
+            key = (row["row_id"], campaign, repetition)
+            if not row["row_id"] or key in keys:
+                raise ValueError(f"prediction artifact row key is empty or duplicated: {requirement['artifact_id']}")
+            keys.add(key)
+    if count != requirement["expected_rows"]:
+        raise ValueError(f"prediction artifact row count differs from contract: {requirement['artifact_id']}")
+    if requirement["pool"] == "all_T":
+        expected_base = {(row_id, campaign) for row_id, campaign, _ in universe}
+    else:
+        expected_base = {
+            (row_id, campaign) for row_id, campaign, role in universe
+            if role == "final_evaluation" and campaign in requirement["campaigns"]
+        }
+    expected_keys = {
+        (row_id, campaign, repetition)
+        for row_id, campaign in expected_base
+        for repetition in range(1, requirement["repetitions"] + 1)
+    }
+    if keys != expected_keys:
+        raise ValueError(f"prediction artifact row universe is incomplete or substituted: {requirement['artifact_id']}")
+
+
+def _trusted_timestamp_values(value):
+    found = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key.lower() in {"timestamp", "time", "integratedtime", "integrated_time"}:
+                if isinstance(child, (int, float)):
+                    found.append(datetime.fromtimestamp(child, timezone.utc))
+                elif isinstance(child, str):
+                    try:
+                        found.append(parse_utc(child) if child.endswith("Z") else datetime.fromisoformat(child).astimezone(timezone.utc))
+                    except ValueError:
+                        pass
+            found.extend(_trusted_timestamp_values(child))
+    elif isinstance(value, list):
+        for child in value:
+            found.extend(_trusted_timestamp_values(child))
+    return found
+
+
+def validate_public_time_attestation(freeze, freeze_path, freeze_commit, unlock_at, repository, runner=subprocess.run):
+    proof = freeze.get("public_time_attestation", {})
+    if proof.get("repository") != GITHUB_REPOSITORY or proof.get("signer_workflow") != ATTESTATION_WORKFLOW:
+        raise ValueError("prediction freeze public attestation identity changed")
+    repository_root = repository.resolve(strict=True)
+    bundle = (repository_root / proof.get("bundle", "")).resolve(strict=True)
+    try:
+        bundle.relative_to(repository_root)
+    except ValueError as error:
+        raise ValueError("attestation bundle escapes the repository") from error
+    completed = runner(
+        [
+            "gh", "attestation", "verify", str(freeze_path), "--bundle", str(bundle),
+            "--repo", GITHUB_REPOSITORY, "--signer-workflow", ATTESTATION_WORKFLOW,
+            "--source-digest", freeze_commit, "--deny-self-hosted-runners", "--format", "json",
+        ],
+        cwd=repository, check=False, capture_output=True, text=True,
+    )
+    if completed.returncode != 0:
+        raise ValueError("GitHub artifact attestation verification failed")
+    try:
+        results = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError("GitHub attestation verifier returned invalid JSON") from error
+    timestamps = []
+    for result in results if isinstance(results, list) else []:
+        timestamps.extend(_trusted_timestamp_values(result.get("verificationResult", {}).get("verifiedTimestamps", [])))
+    if not timestamps:
+        raise ValueError("GitHub attestation has no cryptographically verified timestamp")
+    if min(timestamps) >= unlock_at:
+        raise ValueError("prediction freeze attestation was not witnessed before unlock")
+    return min(timestamps)
 
 
 def validate_prediction_freeze(policy, stage, freeze_path, freeze_commit, manifest_path, repository):
     rule = policy["release_stages"][stage]
     freeze = json.loads(freeze_path.read_text(encoding="utf-8"))
-    if freeze.get("schema_version") != "2.0" or freeze.get("status") != rule["condition_id"]:
+    if freeze.get("schema_version") != "3.0" or freeze.get("status") != rule["condition_id"]:
         raise ValueError("prediction freeze identity differs from release condition")
     if freeze.get("code_committed_and_pushed") is not True:
         raise ValueError("prediction freeze does not confirm committed and pushed code")
     if set(freeze.get("prediction_sets", [])) != set(rule["required_prediction_sets"]):
         raise ValueError("prediction sets differ from timelock policy")
-    checksums = freeze.get("prediction_checksums")
-    if not isinstance(checksums, dict) or not checksums:
-        raise ValueError("prediction checksum inventory is empty")
-    if any(not isinstance(name, str) or not name or not SHA256.fullmatch(value or "") for name, value in checksums.items()):
-        raise ValueError("prediction checksum inventory contains an invalid entry")
     repository_root = repository.resolve(strict=True)
-    for name, expected in checksums.items():
-        candidate = (repository_root / name).resolve(strict=True)
-        try:
-            candidate.relative_to(repository_root)
-        except ValueError as error:
-            raise ValueError("prediction artifact escapes the repository") from error
-        if not candidate.is_file() or candidate.is_symlink():
-            raise ValueError("prediction artifact is missing, unsafe, or not a regular file")
-        actual = hashlib.sha256(candidate.read_bytes()).hexdigest()
-        if actual != expected:
-            raise ValueError(f"prediction artifact commitment mismatch: {name}")
+    contract_path = repository_root / policy["prediction_contract"]["path"]
+    if digest(contract_path) != policy["prediction_contract"]["sha256"]:
+        raise ValueError("working prediction contract differs from registered policy")
+    contract = validate_prediction_contract_file(contract_path, repository_root)
+    if freeze.get("prediction_contract_sha256") != digest(contract_path):
+        raise ValueError("prediction freeze points to a different prediction contract")
+    required = {
+        item["artifact_id"]: item for item in contract["artifact_requirements"]
+        if item["prediction_set"] in rule["required_prediction_sets"]
+    }
+    artifacts = freeze.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise ValueError("prediction freeze artifact inventory is missing")
+    artifact_map = {item.get("artifact_id"): item for item in artifacts}
+    if None in artifact_map or len(artifact_map) != len(artifacts) or set(artifact_map) != set(required):
+        raise ValueError("prediction freeze artifact inventory is not exactly the registered contract")
+    universe = load_prediction_universe(repository_root, contract)
+    for artifact_id, requirement in required.items():
+        frozen = artifact_map[artifact_id]
+        if frozen.get("path") != requirement["path"] or not SHA256.fullmatch(frozen.get("sha256") or ""):
+            raise ValueError(f"prediction freeze artifact identity differs from contract: {artifact_id}")
+        validate_prediction_artifact(repository_root, requirement, frozen["sha256"], universe)
     if freeze.get("timelock_seal_manifest_sha256") != digest(manifest_path):
         raise ValueError("prediction freeze points to a different timelock seal")
     code_commit = freeze.get("code_commit")
@@ -180,19 +402,22 @@ def validate_prediction_freeze(policy, stage, freeze_path, freeze_commit, manife
     ).astimezone(timezone.utc)
     if commit_time >= unlock_at:
         raise ValueError("prediction freeze commit time is not before the registered unlock")
+    validate_public_time_attestation(freeze, freeze_path, freeze_commit, unlock_at, repository)
     return freeze
 
 
 def verify_release(
     policy_path, stage, run_dir, manifest_path, freeze_path, freeze_commit, repository,
-    beacon_state=None,
+    tle_path=None, beacon_state=None,
 ):
     policy = json.loads(policy_path.read_text(encoding="utf-8"))
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     timelock = validate_seal_manifest(policy, policy_path, run_dir, manifest, manifest_path.parent)
     validate_seal_commit(policy_path, manifest["code_commit"], repository)
     validate_prediction_freeze(policy, stage, freeze_path, freeze_commit, manifest_path, repository)
-    beacon_state = beacon_state or fetch_beacon_state(timelock)
+    if beacon_state is None and tle_path is None:
+        raise ValueError("tle binary is required for live drand signature verification")
+    beacon_state = beacon_state or fetch_beacon_state(timelock, tle_path)
     required_round = timelock["stages"][stage]["round"]
     if beacon_state["latest"]["round"] < required_round:
         raise ValueError("registered drand round has not been published")
@@ -213,6 +438,8 @@ def main():
         command = subparsers.add_parser(name)
         command.add_argument("run_directory", type=Path)
         command.add_argument("seal_manifest", type=Path)
+        if name == "initial":
+            command.add_argument("replica_manifest", type=Path)
         command.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[2])
     release = subparsers.add_parser("release")
     release.add_argument("stage", choices=("adaptation", "final_evaluation"))
@@ -220,6 +447,7 @@ def main():
     release.add_argument("seal_manifest", type=Path)
     release.add_argument("freeze_manifest", type=Path)
     release.add_argument("freeze_commit")
+    release.add_argument("--tle", type=Path, required=True)
     release.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[2])
     args = parser.parse_args()
     policy_path = args.policy.resolve(strict=True)
@@ -231,13 +459,14 @@ def main():
     elif args.command == "initial":
         result = verify_initial(
             policy_path, args.run_directory.resolve(strict=True), args.seal_manifest.resolve(strict=True),
+            args.replica_manifest.resolve(strict=True),
             args.repository.resolve(strict=True),
         )
     else:
         result = verify_release(
             policy_path, args.stage, args.run_directory.resolve(strict=True),
             args.seal_manifest.resolve(strict=True), args.freeze_manifest.resolve(strict=True),
-            args.freeze_commit, args.repository.resolve(strict=True),
+            args.freeze_commit, args.repository.resolve(strict=True), args.tle.resolve(strict=True),
         )
     print(canonical_json(result), end="")
 

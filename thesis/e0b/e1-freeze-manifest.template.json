@@ -1,12 +1,22 @@
 {
-  "schema_version": "2.0",
+  "schema_version": "3.0",
   "status": "E1_E1a_predictions_frozen",
   "frozen_at_utc": "REPLACE_WITH_ISO_8601_UTC_TIME",
   "code_commit": "REPLACE_WITH_PUSHED_CODE_COMMIT",
   "code_committed_and_pushed": true,
   "timelock_seal_manifest_sha256": "REPLACE_WITH_TIMELOCK_SEAL_MANIFEST_SHA256",
+  "prediction_contract_sha256": "REPLACE_WITH_REGISTERED_PREDICTION_CONTRACT_SHA256",
   "prediction_sets": ["E1", "E1a"],
-  "prediction_checksums": {
-    "REPLACE_WITH_REPOSITORY_RELATIVE_PREDICTION_MANIFEST": "REPLACE_WITH_SHA256"
+  "artifacts": [
+    {
+      "artifact_id": "REPLACE_WITH_EACH_CONTRACT_E1_OR_E1A_ARTIFACT_ID",
+      "path": "REPLACE_WITH_EXACT_CONTRACT_PATH",
+      "sha256": "REPLACE_WITH_SHA256"
+    }
+  ],
+  "public_time_attestation": {
+    "repository": "ClearChenxi/MatrAIx-Persona-8B",
+    "signer_workflow": "github.com/ClearChenxi/MatrAIx-Persona-8B/.github/workflows/attest-prediction-freeze.yml",
+    "bundle": "thesis/e0b/attestations/e1-freeze-bundle.jsonl"
   }
 }

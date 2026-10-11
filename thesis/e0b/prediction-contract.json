@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "status": "pending_protocol_freeze",
+  "reason": "E1 methods, E1a ablations, repetitions, and executable E2 budgets must be fixed after D/R development and before one-time timelock schedule registration",
+  "T_campaigns": [14, 15, 16, 17, 19, 20, 21, 22, 23, 25],
+  "pool_rows": {
+    "adaptation": 328,
+    "final_evaluation": 1386,
+    "all_T": 1714
+  },
+  "campaign_pool_rows": {
+    "14": {"adaptation": 35, "final_evaluation": 188, "all_T": 223},
+    "15": {"adaptation": 2, "final_evaluation": 14, "all_T": 16},
+    "16": {"adaptation": 35, "final_evaluation": 153, "all_T": 188},
+    "17": {"adaptation": 29, "final_evaluation": 173, "all_T": 202},
+    "19": {"adaptation": 25, "final_evaluation": 105, "all_T": 130},
+    "20": {"adaptation": 53, "final_evaluation": 191, "all_T": 244},
+    "21": {"adaptation": 18, "final_evaluation": 47, "all_T": 65},
+    "22": {"adaptation": 47, "final_evaluation": 229, "all_T": 276},
+    "23": {"adaptation": 43, "final_evaluation": 140, "all_T": 183},
+    "25": {"adaptation": 41, "final_evaluation": 146, "all_T": 187}
+  },
+  "E1_and_E1a_pool": "all_T",
+  "E2_prediction_pool": "final_evaluation",
+  "required_prediction_sets": ["E1", "E1a", "E2"],
+  "row_universe": {
+    "path": "thesis/e1_data/runs/e1-data-20261011T042328.304949Z/private/links_T.csv",
+    "sha256": "c4e2be2bfde72c2049cf8c78c824fedfbfe9212415ba0b35634c5407a9b9d9eb"
+  },
+  "registration_required_fields": [
+    "T_campaigns",
+    "pool_rows",
+    "campaign_pool_rows",
+    "row_universe.path",
+    "row_universe.sha256",
+    "artifact_requirements[].artifact_id",
+    "artifact_requirements[].prediction_set",
+    "artifact_requirements[].method_id",
+    "artifact_requirements[].variant_id",
+    "artifact_requirements[].pool",
+    "artifact_requirements[].campaigns",
+    "artifact_requirements[].repetitions",
+    "artifact_requirements[].adaptation_budget_per_campaign",
+    "artifact_requirements[].expected_rows",
+    "artifact_requirements[].prediction_column",
+    "artifact_requirements[].path"
+  ],
+  "artifact_requirements": []
+}

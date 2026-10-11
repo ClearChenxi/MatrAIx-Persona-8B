@@ -1,0 +1,30 @@
+name: Attest prediction freeze
+
+on:
+  push:
+    branches:
+      - thesis-integration-3633d8d
+    paths:
+      - thesis/e0b/freezes/e1-freeze-manifest.json
+      - thesis/e0b/freezes/e2-freeze-manifest.json
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Attest E1 prediction freeze
+        if: ${{ hashFiles('thesis/e0b/freezes/e1-freeze-manifest.json') != '' }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: thesis/e0b/freezes/e1-freeze-manifest.json
+      - name: Attest E2 prediction freeze
+        if: ${{ hashFiles('thesis/e0b/freezes/e2-freeze-manifest.json') != '' }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: thesis/e0b/freezes/e2-freeze-manifest.json

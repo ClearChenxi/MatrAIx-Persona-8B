@@ -20,6 +20,7 @@ def unlock(
 ):
     release = verify_release(
         policy_path, stage, run_dir, manifest_path, freeze_path, freeze_commit, repository,
+        tle_path,
     )
     inspect_tle_binary(tle_path)
     policy = json.loads(policy_path.read_text(encoding="utf-8"))

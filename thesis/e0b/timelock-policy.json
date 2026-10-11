@@ -8,6 +8,29 @@
     "cannot replace an independent witness for historical researcher conduct",
     "a stage is invalid if its required prediction freeze was not pushed before the scheduled unlock"
   ],
+  "prediction_contract": {
+    "status": "pending_protocol_freeze",
+    "path": "thesis/e0b/prediction-contract.json",
+    "sha256": null
+  },
+  "governance_controls": {
+    "plaintext_scan_scope": [
+      "repository:thesis/e0b/runs",
+      "derived:redemption_and_transaction_source_parent",
+      "derived:original_archive_parent"
+    ],
+    "replicas": {
+      "minimum": 2,
+      "distinct_resolved_directories": true,
+      "distinct_storage_location_ids": true,
+      "live_copy_restore_and_sha256": true
+    },
+    "public_time_attestation": {
+      "repository": "ClearChenxi/MatrAIx-Persona-8B",
+      "signer_workflow": "github.com/ClearChenxi/MatrAIx-Persona-8B/.github/workflows/attest-prediction-freeze.yml",
+      "trusted_timestamp_must_precede_unlock": true
+    }
+  },
   "timelock": {
     "status": "pending_schedule_registration",
     "implementation": "github.com/drand/tlock/cmd/tle",

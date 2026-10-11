@@ -86,7 +86,7 @@ def prepare(policy_path, run_dir, output_dir, repository, tle_path, beacon_state
     timelock = validate_policy(policy)
     head = require_clean_pushed_repository(repository)
     tle = inspect_tle_binary(tle_path)
-    beacon_state = beacon_state or fetch_beacon_state(timelock)
+    beacon_state = beacon_state or fetch_beacon_state(timelock, tle_path)
     latest_round = beacon_state["latest"]["round"]
     adaptation_round = timelock["stages"]["adaptation"]["round"]
     lead = (adaptation_round - latest_round) * timelock["period_seconds"]
@@ -120,6 +120,7 @@ def prepare(policy_path, run_dir, output_dir, repository, tle_path, beacon_state
             )
             record = {
                 "source_parent_sha256": commitments["labels_T_parent"],
+                "source_parent_bytes": label_path.stat().st_size,
                 "e2_role": rule["e2_role"],
                 "rows": rule["expected_rows"],
             }
@@ -138,6 +139,7 @@ def prepare(policy_path, run_dir, output_dir, repository, tle_path, beacon_state
             "drand_round": round_number,
             "unlock_at_utc": timelock["stages"][stage]["unlock_at_utc"],
             "plaintext_sha256": plaintext_sha256,
+            "plaintext_bytes": len(split_data[object_id]) if object_id in split_data else source.stat().st_size,
             "ciphertext_file": filename,
             "ciphertext_sha256": digest(encrypted),
         })

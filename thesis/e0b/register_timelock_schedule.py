@@ -7,15 +7,17 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from audit import canonical_json
+from audit import canonical_json, digest
 from timelock_common import (
     fetch_beacon_state, first_round_at_or_after, parse_utc, round_timestamp,
-    utc_text, validate_policy,
+    utc_text, validate_pending_schedule, validate_policy, validate_prediction_contract_file,
 )
 
 
-def register(policy, adaptation_at, final_at, beacon_state):
-    timelock = validate_policy(policy, require_schedule=False)
+def register(policy, adaptation_at, final_at, beacon_state, contract_sha256):
+    timelock = validate_pending_schedule(policy)
+    if not isinstance(contract_sha256, str) or len(contract_sha256) != 64:
+        raise ValueError("registered prediction contract digest is required")
     adaptation_requested = int(parse_utc(adaptation_at).timestamp())
     final_requested = int(parse_utc(final_at).timestamp())
     latest_round = beacon_state["latest"]["round"]
@@ -39,6 +41,11 @@ def register(policy, adaptation_at, final_at, beacon_state):
         "observed_latest_signature": beacon_state["latest"]["signature"],
     }
     timelock["status"] = "registered"
+    policy["prediction_contract"] = {
+        "status": "registered",
+        "path": "thesis/e0b/prediction-contract.json",
+        "sha256": contract_sha256,
+    }
     policy["status"] = "timelock_schedule_registered"
     validate_policy(policy)
     return policy
@@ -49,12 +56,16 @@ def main():
     parser.add_argument("adaptation_unlock_utc", help="ISO 8601 UTC, for example 2026-12-01T00:00:00Z")
     parser.add_argument("final_unlock_utc", help="ISO 8601 UTC, later than adaptation")
     parser.add_argument("--policy", type=Path, default=Path(__file__).with_name("timelock-policy.json"))
+    parser.add_argument("--tle", type=Path, required=True)
+    parser.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[2])
     args = parser.parse_args()
     path = args.policy.resolve(strict=True)
     policy = json.loads(path.read_text(encoding="utf-8"))
     timelock = validate_policy(policy, require_schedule=False)
-    state = fetch_beacon_state(timelock)
-    updated = register(policy, args.adaptation_unlock_utc, args.final_unlock_utc, state)
+    contract_path = args.repository.resolve(strict=True) / policy["prediction_contract"]["path"]
+    validate_prediction_contract_file(contract_path, args.repository)
+    state = fetch_beacon_state(timelock, args.tle.resolve(strict=True))
+    updated = register(policy, args.adaptation_unlock_utc, args.final_unlock_utc, state, digest(contract_path))
     path.write_text(canonical_json(updated), encoding="utf-8")
     print(canonical_json({"status": "timelock_schedule_registered", "stages": updated["timelock"]["stages"]}), end="")
 

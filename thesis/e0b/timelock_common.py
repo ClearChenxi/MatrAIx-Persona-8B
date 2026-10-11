@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import re
 import subprocess
+import tempfile
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +19,7 @@ from audit import digest
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 EXPECTED_BRANCH = "thesis-integration-3633d8d"
+MAX_BEACON_AGE_PERIODS = 5
 
 
 def parse_utc(value):
@@ -101,6 +104,35 @@ def validate_policy(policy, require_schedule=True):
     }
     if policy.get("release_stages") != expected_release:
         raise ValueError("timelock release rules changed")
+    contract = policy.get("prediction_contract", {})
+    if contract.get("path") != "thesis/e0b/prediction-contract.json":
+        raise ValueError("prediction contract path changed")
+    if contract.get("status") not in {"pending_protocol_freeze", "registered"}:
+        raise ValueError("prediction contract has an invalid status")
+    if contract["status"] == "pending_protocol_freeze" and contract.get("sha256") is not None:
+        raise ValueError("pending prediction contract must not have a registered digest")
+    if contract["status"] == "registered" and not SHA256.fullmatch(contract.get("sha256") or ""):
+        raise ValueError("registered prediction contract digest is invalid")
+    expected_governance = {
+        "plaintext_scan_scope": [
+            "repository:thesis/e0b/runs",
+            "derived:redemption_and_transaction_source_parent",
+            "derived:original_archive_parent",
+        ],
+        "replicas": {
+            "minimum": 2,
+            "distinct_resolved_directories": True,
+            "distinct_storage_location_ids": True,
+            "live_copy_restore_and_sha256": True,
+        },
+        "public_time_attestation": {
+            "repository": "ClearChenxi/MatrAIx-Persona-8B",
+            "signer_workflow": "github.com/ClearChenxi/MatrAIx-Persona-8B/.github/workflows/attest-prediction-freeze.yml",
+            "trusted_timestamp_must_precede_unlock": True,
+        },
+    }
+    if policy.get("governance_controls") != expected_governance:
+        raise ValueError("timelock governance controls changed")
     if not require_schedule:
         return timelock
     if policy.get("status") != "timelock_schedule_registered" or timelock.get("status") != "registered":
@@ -121,16 +153,140 @@ def validate_policy(policy, require_schedule=True):
     return timelock
 
 
+def validate_pending_schedule(policy):
+    timelock = validate_policy(policy, require_schedule=False)
+    if policy.get("status") != "awaiting_timelock_schedule_registration":
+        raise ValueError("timelock policy is not awaiting its one-time schedule registration")
+    if timelock.get("status") != "pending_schedule_registration":
+        raise ValueError("timelock schedule was already registered")
+    if timelock.get("schedule_registration") is not None:
+        raise ValueError("timelock schedule registration record already exists")
+    expected = {"requested_unlock_at_utc": None, "unlock_at_utc": None, "round": None}
+    stages = timelock.get("stages")
+    if set(stages or {}) != {"adaptation", "final_evaluation"}:
+        raise ValueError("timelock stage inventory changed")
+    if any(record != expected for record in stages.values()):
+        raise ValueError("timelock schedule contains a prior or partial registration")
+    return timelock
+
+
+def validate_prediction_contract_file(path, repository=None):
+    contract = json.loads(path.read_text(encoding="utf-8"))
+    if contract.get("schema_version") != "1.0" or contract.get("status") != "registered":
+        raise ValueError("prediction contract is not fully registered")
+    campaigns = contract.get("T_campaigns")
+    if campaigns != [14, 15, 16, 17, 19, 20, 21, 22, 23, 25]:
+        raise ValueError("prediction contract T campaign inventory changed")
+    if contract.get("pool_rows") != {"adaptation": 328, "final_evaluation": 1386, "all_T": 1714}:
+        raise ValueError("prediction contract T pool sizes changed")
+    expected_campaign_rows = {
+        "14": {"adaptation": 35, "final_evaluation": 188, "all_T": 223},
+        "15": {"adaptation": 2, "final_evaluation": 14, "all_T": 16},
+        "16": {"adaptation": 35, "final_evaluation": 153, "all_T": 188},
+        "17": {"adaptation": 29, "final_evaluation": 173, "all_T": 202},
+        "19": {"adaptation": 25, "final_evaluation": 105, "all_T": 130},
+        "20": {"adaptation": 53, "final_evaluation": 191, "all_T": 244},
+        "21": {"adaptation": 18, "final_evaluation": 47, "all_T": 65},
+        "22": {"adaptation": 47, "final_evaluation": 229, "all_T": 276},
+        "23": {"adaptation": 43, "final_evaluation": 140, "all_T": 183},
+        "25": {"adaptation": 41, "final_evaluation": 146, "all_T": 187},
+    }
+    if contract.get("campaign_pool_rows") != expected_campaign_rows:
+        raise ValueError("prediction contract per-campaign pool sizes changed")
+    expected_universe = {
+        "path": "thesis/e1_data/runs/e1-data-20261011T042328.304949Z/private/links_T.csv",
+        "sha256": "c4e2be2bfde72c2049cf8c78c824fedfbfe9212415ba0b35634c5407a9b9d9eb",
+    }
+    if contract.get("row_universe") != expected_universe:
+        raise ValueError("prediction contract row universe changed")
+    if repository is not None:
+        universe_path = repository.resolve(strict=True) / expected_universe["path"]
+        if digest(universe_path) != expected_universe["sha256"]:
+            raise ValueError("prediction contract row universe file is missing or changed")
+    artifacts = contract.get("artifact_requirements")
+    if not isinstance(artifacts, list) or not artifacts:
+        raise ValueError("prediction contract artifact inventory is empty")
+    ids = [record.get("artifact_id") for record in artifacts]
+    if any(not isinstance(value, str) or not value for value in ids) or len(set(ids)) != len(ids):
+        raise ValueError("prediction contract artifact IDs must be nonempty and unique")
+    covered_sets = set()
+    paths = set()
+    for record in artifacts:
+        prediction_set = record.get("prediction_set")
+        covered_sets.add(prediction_set)
+        if prediction_set not in {"E1", "E1a", "E2"}:
+            raise ValueError("prediction contract contains an unknown prediction set")
+        if not all(isinstance(record.get(key), str) and record[key] for key in ("method_id", "variant_id", "path", "prediction_column")):
+            raise ValueError("prediction contract method, variant, and path must be explicit")
+        if (
+            record["path"] in paths or Path(record["path"]).is_absolute()
+            or ".." in Path(record["path"]).parts or Path(record["path"]).suffix.lower() != ".csv"
+        ):
+            raise ValueError("prediction artifact paths must be unique repository-relative paths")
+        paths.add(record["path"])
+        record_campaigns = record.get("campaigns")
+        if not isinstance(record_campaigns, list) or not record_campaigns or not set(record_campaigns) <= set(campaigns):
+            raise ValueError("prediction artifact campaign inventory is invalid")
+        repetitions = record.get("repetitions")
+        expected_rows = record.get("expected_rows")
+        if not isinstance(repetitions, int) or repetitions < 1 or not isinstance(expected_rows, int) or expected_rows < 1:
+            raise ValueError("prediction artifact repetitions and row count must be positive integers")
+        budget = record.get("adaptation_budget_per_campaign")
+        if prediction_set in {"E1", "E1a"}:
+            if record.get("pool") != "all_T" or record_campaigns != campaigns or budget != 0:
+                raise ValueError("E1/E1a artifacts must cover all T rows without adaptation labels")
+            if expected_rows != 1714 * repetitions:
+                raise ValueError("E1/E1a expected rows must equal all T rows times repetitions")
+        else:
+            if record.get("pool") != "final_evaluation" or not isinstance(budget, int) or budget < 1:
+                raise ValueError("E2 artifacts must declare a positive adaptation budget and final pool")
+            available = [expected_campaign_rows[str(campaign)]["adaptation"] for campaign in record_campaigns]
+            if budget > min(available):
+                raise ValueError("E2 adaptation budget exceeds an included campaign pool")
+            expected = sum(
+                expected_campaign_rows[str(campaign)]["final_evaluation"] for campaign in record_campaigns
+            ) * repetitions
+            if expected_rows != expected:
+                raise ValueError("E2 expected rows do not equal registered campaign pools times repetitions")
+    if covered_sets != {"E1", "E1a", "E2"}:
+        raise ValueError("prediction contract must fully enumerate E1, E1a, and E2")
+    return contract
+
+
 def fetch_json(url, opener=urllib.request.urlopen):
     request = urllib.request.Request(url, headers={"User-Agent": "thesis-timelock/1.0"})
     with opener(request, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
-def fetch_beacon_state(timelock, opener=urllib.request.urlopen):
-    base = f"{timelock['network_url'].rstrip('/')}/{timelock['chain_hash']}"
-    info = fetch_json(f"{base}/info", opener)
-    latest = fetch_json(f"{base}/public/latest", opener)
+def verify_beacon_signature(timelock, latest, tle_path, runner=subprocess.run):
+    inspect_tle_binary(tle_path)
+    probe = b"thesis-drand-signature-probe-v1\n"
+    with tempfile.TemporaryDirectory() as directory:
+        encrypted = Path(directory) / "probe.tle"
+        recovered = Path(directory) / "probe.txt"
+        encrypted_result = runner(
+            [
+                str(tle_path), "-e", "-n", timelock["network_url"],
+                "-c", timelock["chain_hash"], "-r", str(latest["round"]),
+                "--force", "-a", "-o", str(encrypted),
+            ],
+            input=probe, check=False, capture_output=True,
+        )
+        if encrypted_result.returncode != 0:
+            raise ValueError("official tle beacon probe encryption failed")
+        decrypted_result = runner(
+            [
+                str(tle_path), "-d", "-n", timelock["network_url"],
+                "-c", timelock["chain_hash"], "-o", str(recovered), str(encrypted),
+            ],
+            check=False, capture_output=True,
+        )
+        if decrypted_result.returncode != 0 or recovered.read_bytes() != probe:
+            raise ValueError("latest drand signature failed official tle verification")
+
+
+def validate_beacon_state(timelock, info, latest, now=None, signature_verifier=None):
     expected = {
         "hash": timelock["chain_hash"],
         "public_key": timelock["public_key"],
@@ -145,7 +301,36 @@ def fetch_beacon_state(timelock, opener=urllib.request.urlopen):
         raise ValueError("live drand beacon ID differs from policy")
     if not isinstance(latest.get("round"), int) or not latest.get("randomness") or not latest.get("signature"):
         raise ValueError("latest drand response is incomplete")
+    try:
+        signature = bytes.fromhex(latest["signature"])
+    except (TypeError, ValueError) as error:
+        raise ValueError("latest drand signature is not hexadecimal") from error
+    if hashlib.sha256(signature).hexdigest() != latest["randomness"]:
+        raise ValueError("latest drand randomness is not the signature digest")
+    observed_at = int((now or datetime.now(timezone.utc)).timestamp())
+    round_time = round_timestamp(timelock, latest["round"])
+    lag = observed_at - round_time
+    if lag < 0:
+        raise ValueError("latest drand response is from a future round")
+    if lag > timelock["period_seconds"] * MAX_BEACON_AGE_PERIODS:
+        raise ValueError("latest drand response is stale")
+    if signature_verifier is None:
+        raise ValueError("a pinned official-library drand signature verifier is required")
+    signature_verifier(timelock, latest)
     return {"info": info, "latest": latest}
+
+
+def fetch_beacon_state(
+    timelock, tle_path, opener=urllib.request.urlopen, now=None,
+    signature_verifier=None,
+):
+    base = f"{timelock['network_url'].rstrip('/')}/{timelock['chain_hash']}"
+    info = fetch_json(f"{base}/info", opener)
+    latest = fetch_json(f"{base}/public/latest", opener)
+    verifier = signature_verifier or (
+        lambda locked, beacon: verify_beacon_signature(locked, beacon, tle_path)
+    )
+    return validate_beacon_state(timelock, info, latest, now, verifier)
 
 
 def run_git(repository, *args, binary=False):
@@ -259,6 +444,42 @@ def verify_inaccessible(paths):
     readable = [name for name, path in paths.items() if path.exists() and os.access(path, os.R_OK)]
     if readable:
         raise ValueError(f"protected plaintext remains readable by executor: {', '.join(sorted(readable))}")
+
+
+def plaintext_scan_roots(repository, run_dir):
+    paths = plaintext_paths(run_dir)
+    roots = {
+        (repository / "thesis/e0b/runs").resolve(),
+        paths["redemption_source"].resolve().parent,
+        paths["transaction_source"].resolve().parent,
+        paths["original_archive"].resolve().parent,
+    }
+    return sorted(roots, key=str)
+
+
+def find_matching_plaintext(search_roots, commitments):
+    by_size = {}
+    for object_id, record in commitments.items():
+        by_size.setdefault(record["bytes"], {})[record["sha256"]] = object_id
+    matches = []
+    scanned = set()
+    for root in search_roots:
+        if not root.exists() or not root.is_dir():
+            raise ValueError(f"plaintext scan root is missing or not a directory: {root}")
+        for path in root.rglob("*"):
+            if path.is_symlink() or not path.is_file() or not os.access(path, os.R_OK):
+                continue
+            resolved = path.resolve()
+            if resolved in scanned:
+                continue
+            scanned.add(resolved)
+            candidates = by_size.get(path.stat().st_size)
+            if not candidates:
+                continue
+            actual = digest(path)
+            if actual in candidates:
+                matches.append({"object_id": candidates[actual], "path": str(resolved)})
+    return matches
 
 
 def object_rules(policy):
