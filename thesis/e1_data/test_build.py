@@ -12,6 +12,7 @@ sys.path.insert(0, str(HERE))
 
 from build import (
     BASE_FEATURE_FIELDS,
+    GROUP_FIELDS,
     full_share_json,
     nearest_rank,
     persona_input,
@@ -35,6 +36,7 @@ class E1DataUnitTests(unittest.TestCase):
         self.assertFalse(permitted_history("T", "T", self.plan))
         self.assertNotIn("household_key", BASE_FEATURE_FIELDS)
         self.assertNotIn("campaign", BASE_FEATURE_FIELDS)
+        self.assertTrue(set(GROUP_FIELDS).isdisjoint(BASE_FEATURE_FIELDS))
 
     def test_nearest_rank_groups_merge_repeated_thresholds(self):
         values = [1, 1, 1, 2, 3, 9]

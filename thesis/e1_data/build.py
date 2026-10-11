@@ -43,9 +43,9 @@ for index in range(1, 9):
 BASE_FEATURE_FIELDS.extend([
     "campaign_other_commodity_weight", "campaign_unknown_taxonomy_flag",
     "target_product_sales_share", "target_commodity_sales_share", "target_product_recency_days",
-    "no_target_product_purchase_flag", "frequency_group", "historical_redemption_group",
-    "target_category_match_group",
+    "no_target_product_purchase_flag",
 ])
+GROUP_FIELDS = ["frequency_group", "historical_redemption_group", "target_category_match_group"]
 
 
 def canonical_json(data):
@@ -649,7 +649,12 @@ def build(plan, output, require_repository=True):
     for split in ("D", "R", "T"):
         rows_by_split[split].sort(key=lambda row: row["row_id"])
         links_by_split[split].sort(key=lambda row: row["row_id"])
-        write_csv(private / f"features_{split}.csv", BASE_FEATURE_FIELDS, rows_by_split[split])
+        write_csv(private / f"features_{split}.csv", BASE_FEATURE_FIELDS, [
+            {name: row[name] for name in BASE_FEATURE_FIELDS} for row in rows_by_split[split]
+        ])
+        write_csv(private / f"groups_{split}.csv", ["row_id", *GROUP_FIELDS], [
+            {name: row[name] for name in ["row_id", *GROUP_FIELDS]} for row in rows_by_split[split]
+        ])
         write_csv(private / f"links_{split}.csv",
                   ["row_id", "household_key", "campaign", "split", "e2_role", "history_lower_day", "history_upper_day"],
                   links_by_split[split])
@@ -700,7 +705,9 @@ def build(plan, output, require_repository=True):
         "identifier_fields": ["row_id"],
         "forbidden_model_fields": ["household_key", "campaign", "split", "e2_role", "y1_redeemed", "y2_target_product_positive_purchase"],
         "feature_fields": BASE_FEATURE_FIELDS[1:],
+        "group_fields": GROUP_FIELDS,
         "fields": [field_spec(name) for name in BASE_FEATURE_FIELDS],
+        "groups": [field_spec(name) for name in GROUP_FIELDS],
         "rules": {
             "history_window": "START_DAY-84 <= DAY < START_DAY",
             "legal_positive_purchase": "QUANTITY > 0, SALES_VALUE >= 0, nonempty BASKET_ID, known PRODUCT_ID",

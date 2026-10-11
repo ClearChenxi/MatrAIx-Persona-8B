@@ -13,7 +13,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from build import BASE_FEATURE_FIELDS, canonical_json, digest, validate_plan
+from build import BASE_FEATURE_FIELDS, GROUP_FIELDS, canonical_json, digest, validate_plan
 
 
 def csv_rows(path):
@@ -52,6 +52,9 @@ def verify(run_dir):
         fields, rows[split] = csv_rows(run_dir / f"private/features_{split}.csv")
         if fields != BASE_FEATURE_FIELDS:
             raise ValueError(f"feature schema mismatch for {split}")
+        group_fields, group_rows = csv_rows(run_dir / f"private/groups_{split}.csv")
+        if group_fields != ["row_id", *GROUP_FIELDS]:
+            raise ValueError(f"group schema mismatch for {split}")
         link_fields, links[split] = csv_rows(run_dir / f"private/links_{split}.csv")
         if not {"row_id", "household_key", "campaign", "split", "e2_role"} <= set(link_fields):
             raise ValueError(f"link schema mismatch for {split}")
@@ -59,6 +62,15 @@ def verify(run_dir):
         link_ids = [row["row_id"] for row in links[split]]
         if feature_ids != sorted(feature_ids) or feature_ids != link_ids or len(feature_ids) != len(set(feature_ids)):
             raise ValueError(f"row identity mismatch for {split}")
+        if [row["row_id"] for row in group_rows] != feature_ids:
+            raise ValueError(f"group-feature identity mismatch for {split}")
+        for row in group_rows:
+            if row["frequency_group"] not in {"low", "medium", "high"}:
+                raise ValueError(f"invalid frequency group in {split}")
+            if row["historical_redemption_group"] not in {"no_history", "low", "high"}:
+                raise ValueError(f"invalid historical redemption group in {split}")
+            if row["target_category_match_group"] not in {"missing", "low", "medium", "high"}:
+                raise ValueError(f"invalid target category group in {split}")
         if len(rows[split]) != manifest["rows"][split]:
             raise ValueError(f"row count mismatch for {split}")
         _, index_rows = csv_rows(run_dir / f"private/model_payload_index_{split}.csv")
