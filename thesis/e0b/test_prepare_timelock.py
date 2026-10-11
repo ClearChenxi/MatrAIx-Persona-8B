@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import csv
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from prepare_custody import split_label_bytes
+from prepare_timelock import split_label_bytes
 
 
-class PrepareCustodyTests(unittest.TestCase):
+class PrepareTimelockTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.path = Path(self.temp.name) / "labels.csv"

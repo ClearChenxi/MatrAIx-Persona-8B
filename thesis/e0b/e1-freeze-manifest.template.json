@@ -1,0 +1,12 @@
+{
+  "schema_version": "2.0",
+  "status": "E1_E1a_predictions_frozen",
+  "frozen_at_utc": "REPLACE_WITH_ISO_8601_UTC_TIME",
+  "code_commit": "REPLACE_WITH_PUSHED_CODE_COMMIT",
+  "code_committed_and_pushed": true,
+  "timelock_seal_manifest_sha256": "REPLACE_WITH_TIMELOCK_SEAL_MANIFEST_SHA256",
+  "prediction_sets": ["E1", "E1a"],
+  "prediction_checksums": {
+    "REPLACE_WITH_REPOSITORY_RELATIVE_PREDICTION_MANIFEST": "REPLACE_WITH_SHA256"
+  }
+}
