@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "status": "pending_protocol_freeze",
-  "reason": "E1 methods, E1a ablations, repetitions, and executable E2 budgets must be fixed after D/R development and before one-time timelock schedule registration",
+  "reason": "Protocol v1.1 defines E1a prediction validity and E1b persona mechanisms. Machine policy still uses legacy E1/E1a/E2 names and must be updated and tested before this contract can enumerate E1a/E1b/E2 artifacts, freeze repetitions, or register the timelock schedule",
   "T_campaigns": [14, 15, 16, 17, 19, 20, 21, 22, 23, 25],
   "pool_rows": {
     "adaptation": 328,

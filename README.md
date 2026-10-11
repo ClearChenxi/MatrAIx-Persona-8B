@@ -38,6 +38,10 @@
 
 ---
 
+> **Thesis experiment branch:** the current Dunnhumby research protocol,
+> execution status, and historical feasibility materials are indexed in
+> [thesis/README.md](thesis/README.md).
+
 **MatrAIx** is a population-scale, persona-driven infrastructure for evaluating
 AI systems and interactive products with heterogeneous simulated users. Instead
 of testing against a generic or interchangeable user, MatrAIx instantiates
