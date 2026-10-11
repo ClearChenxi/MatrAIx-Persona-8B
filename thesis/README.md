@@ -20,7 +20,10 @@ Use these documents in order:
 E1 is the parent experiment and does not produce a separate prediction
 artifact. E1a covers predictive validity and comparison with traditional
 methods; E1b covers the incremental value and mechanisms of Persona. The
-fourth-level activity-person matching question remains deferred.
+fourth-level activity-person matching question remains deferred. E2 is a
+planned application experiment testing whether a frozen P1 score adds value to
+B3 under the same limited target-label budget; it does not create a fifth
+research level.
 
 ## Current execution boundary
 
