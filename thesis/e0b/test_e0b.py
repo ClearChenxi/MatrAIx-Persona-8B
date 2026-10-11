@@ -121,7 +121,9 @@ class E0bAuditTests(unittest.TestCase):
         self.assertFalse(manifest["label_table_opened"])
         safe = seal(self.plan, run_dir)
         self.assertFalse(safe["test_label_values_exposed"])
-        self.assertNotIn("y1_positive", json.dumps(safe))
+        self.assertEqual(set(safe["historical_label_summary"]), {"D", "R"})
+        self.assertNotIn("T", safe["historical_label_summary"])
+        self.assertEqual(safe["historical_label_summary"]["D"]["rows"], safe["eligible_rows_by_split"]["D"])
         anomalies = safe["predeclared_invalid_redemption_counts"]
         self.assertEqual(anomalies["duplicate_exact_redemption_row"], 1)
         self.assertEqual(anomalies["coupon_belongs_to_other_campaign"], 1)
@@ -130,6 +132,7 @@ class E0bAuditTests(unittest.TestCase):
         result = verify(run_dir)
         self.assertEqual(result["status"], "verified")
         self.assertEqual(result["activities"], 25)
+        self.assertEqual(set(result["historical_label_summary"]), {"D", "R"})
         permissions = json.loads((run_dir / "public/time_and_label_permissions.json").read_text())
         self.assertTrue(all(permissions["checks"].values()))
         with (run_dir / "private/cohort_permissions.csv").open(newline="") as stream:

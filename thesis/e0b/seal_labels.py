@@ -159,6 +159,19 @@ def seal(plan, run_dir):
         if digest(paths[name]) != source_manifest[name]["sha256"]:
             raise ValueError(f"source changed during label sealing: {name}")
 
+    historical_summary = {}
+    for split in ("D", "R"):
+        count = private_summary["rows"][split]
+        y1_positive = private_summary["y1_positive"][split]
+        y2_positive = private_summary["y2_positive"][split]
+        historical_summary[split] = {
+            "rows": count,
+            "y1_positive": y1_positive,
+            "y1_rate": round(y1_positive / count, 12) if count else None,
+            "y2_positive": y2_positive,
+            "y2_rate": round(y2_positive / count, 12) if count else None,
+        }
+
     safe = {
         "status": "labels_constructed_and_T_logically_sealed",
         "sealed_at": datetime.now(timezone.utc).isoformat(),
@@ -168,6 +181,7 @@ def seal(plan, run_dir):
             "Y3": plan["label_policy"]["y3"],
         },
         "eligible_rows_by_split": {split: len(data) for split, data in labels.items()},
+        "historical_label_summary": historical_summary,
         "redemption_rows_scanned": source_manifest["coupon_redempt.csv"]["rows_excluding_header"],
         "predeclared_invalid_redemption_counts": dict(sorted(anomaly.items())),
         "sealed_files": {filename: digest(private / filename) for filename in filenames.values()},

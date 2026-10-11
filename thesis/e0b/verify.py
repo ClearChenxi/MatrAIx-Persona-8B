@@ -30,6 +30,11 @@ def verify(run_dir):
         raise ValueError("E0b manifest is not safely complete")
     if seal["test_label_values_exposed"] or seal["test_positive_count_exposed"] or seal["test_response_rate_exposed"]:
         raise ValueError("T label seal reports forbidden result information")
+    if set(seal["historical_label_summary"]) != {"D", "R"}:
+        raise ValueError("public historical label summary must contain D/R and exclude T")
+    for split in ("D", "R"):
+        if seal["historical_label_summary"][split]["rows"] != seal["eligible_rows_by_split"][split]:
+            raise ValueError(f"public {split} label summary row count is inconsistent")
     if seal["test_file_mode"] != "0o600":
         raise ValueError("T label file is not owner-only")
     if flow["e2"]["labels_used_for_assignment"]:
@@ -73,6 +78,7 @@ def verify(run_dir):
         "source_rows": manifest["source_rows"],
         "activities": len(activities["activities"]),
         "eligible_rows_by_split": seal["eligible_rows_by_split"],
+        "historical_label_summary": seal["historical_label_summary"],
         "e2_unique_test_households": len(role_by_household),
         "test_label_values_exposed": False,
         "model_calls": 0,
