@@ -130,6 +130,7 @@ class E0bAuditTests(unittest.TestCase):
         self.assertEqual(anomalies["coupon_belongs_to_other_campaign"], 1)
         self.assertEqual(anomalies["redemption_outside_campaign_dates"], 1)
         self.assertEqual(anomalies["household_not_participating_in_declared_campaign"], 1)
+        lock_sources(run_dir, execute=True)
         result = verify(run_dir)
         self.assertEqual(result["status"], "verified")
         self.assertEqual(result["activities"], 25)
@@ -173,6 +174,7 @@ class E0bAuditTests(unittest.TestCase):
         run_dir = self.root / "permission-drift"
         run_audit(self.plan, run_dir, require_repository=False)
         seal(self.plan, run_dir)
+        lock_sources(run_dir, execute=True)
         private_file = run_dir / "private/labels_T_SEALED.csv"
         private_file.chmod(0o644)
         with self.assertRaisesRegex(ValueError, "private file current mode"):
@@ -180,6 +182,16 @@ class E0bAuditTests(unittest.TestCase):
         private_file.chmod(0o600)
         (run_dir / "private").chmod(0o755)
         with self.assertRaisesRegex(ValueError, "directory current mode"):
+            verify(run_dir)
+
+    def test_verifier_rejects_current_source_permission_drift(self):
+        run_dir = self.root / "source-permission-drift"
+        run_audit(self.plan, run_dir, require_repository=False)
+        seal(self.plan, run_dir)
+        lock_sources(run_dir, execute=True)
+        source = self.data / "campaign_desc.csv"
+        source.chmod(0o644)
+        with self.assertRaisesRegex(ValueError, "source current mode"):
             verify(run_dir)
 
     def test_registered_sources_are_hash_checked_and_made_read_only(self):

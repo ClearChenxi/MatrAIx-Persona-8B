@@ -9,6 +9,7 @@ import stat
 from pathlib import Path
 
 from audit import canonical_json, digest, validate_plan
+from lock_sources import check_sources
 
 
 def permission_mode(path):
@@ -37,6 +38,7 @@ def verify_private_permissions(run_dir):
 
 def verify(run_dir):
     private_file_count = verify_private_permissions(run_dir)
+    source_permission_result = check_sources(run_dir, verify_hashes=False)
     plan = json.loads((run_dir / "plan.json").read_text(encoding="utf-8"))
     validate_plan(plan)
     checksums = json.loads((run_dir / "checksums.json").read_text(encoding="utf-8"))
@@ -101,6 +103,7 @@ def verify(run_dir):
         "status": "verified",
         "verified_files": len(actual),
         "private_files_with_current_mode_verified": private_file_count,
+        "source_objects_with_current_mode_verified": source_permission_result["registered_objects"],
         "source_files": manifest["source_files"],
         "source_rows": manifest["source_rows"],
         "activities": len(activities["activities"]),

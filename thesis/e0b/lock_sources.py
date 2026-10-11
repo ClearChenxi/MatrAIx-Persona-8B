@@ -25,6 +25,23 @@ def registered_sources(run_dir):
     return records
 
 
+def check_sources(run_dir, verify_hashes=False):
+    records = registered_sources(run_dir)
+    for name, path, expected_sha256 in records:
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"registered source is missing, not regular, or a symlink: {name}")
+        if mode(path) != 0o444:
+            raise ValueError(f"registered source current mode is not 0o444: {name}")
+        if verify_hashes and digest(path) != expected_sha256:
+            raise ValueError(f"registered source hash changed: {name}")
+    return {
+        "status": "source_permissions_verified",
+        "registered_objects": len(records),
+        "verified_mode": "0o444",
+        "content_hashes_checked": verify_hashes,
+    }
+
+
 def lock_sources(run_dir, execute=False):
     records = registered_sources(run_dir)
     if not execute:
@@ -41,25 +58,30 @@ def lock_sources(run_dir, execute=False):
             raise ValueError(f"registered source hash changed before read-only hardening: {name}")
     for _, path, _ in records:
         os.chmod(path, 0o444, follow_symlinks=False)
-    changed = [name for name, path, _ in records if mode(path) != 0o444]
-    if changed:
-        raise ValueError(f"registered source did not become 0o444: {', '.join(changed)}")
-    return {
+    result = check_sources(run_dir, verify_hashes=False)
+    result.update({
         "status": "source_permissions_hardened",
-        "registered_objects": len(records),
         "csv_files": len(records) - 1,
         "archive_files": 1,
-        "verified_mode": "0o444",
         "content_hashes_unchanged": True,
-    }
+    })
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path)
-    parser.add_argument("--execute", action="store_true")
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument("--execute", action="store_true")
+    action.add_argument("--check", action="store_true")
+    action.add_argument("--check-hashes", action="store_true")
     args = parser.parse_args()
-    print(canonical_json(lock_sources(args.run_directory.resolve(strict=True), execute=args.execute)), end="")
+    run_dir = args.run_directory.resolve(strict=True)
+    if args.check or args.check_hashes:
+        result = check_sources(run_dir, verify_hashes=args.check_hashes)
+    else:
+        result = lock_sources(run_dir, execute=args.execute)
+    print(canonical_json(result), end="")
 
 
 if __name__ == "__main__":

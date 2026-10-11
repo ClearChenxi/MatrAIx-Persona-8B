@@ -1,55 +1,81 @@
 {
-  "schema_version": "1.0",
-  "status": "required_before_formal_T_prediction",
-  "purpose": "independent custody of T outcomes and every locally accessible source that can reconstruct them",
+  "schema_version": "2.0",
+  "status": "awaiting_trusted_custodian_registration",
+  "experiment_path": "retain_E2_with_two_stage_release",
+  "purpose": "independent custody of T outcomes with adaptation and final-evaluation labels released at different frozen stages",
+  "trusted_custodian": {
+    "status": "pending_external_registration",
+    "name": null,
+    "role": null,
+    "gpg_fingerprint": null,
+    "public_key_sha256": null,
+    "external_attestation_type": null,
+    "external_attestation_sha256": null
+  },
   "custodian_requirements": {
     "independent_person_or_system_account": true,
     "executor_must_not_hold_decryption_key": true,
-    "signed_receipt_required": true,
-    "release_condition": "all frozen E1/E1a predictions and any approved E2 predictions have been committed, pushed, and hash-registered"
+    "receipt_signature_must_match_policy_fingerprint": true,
+    "final_evaluation_by_custodian_preferred": true
   },
-  "protected_objects": [
-    {
-      "id": "sealed_T_labels",
-      "source": "e0b_private",
-      "relative_path": "private/labels_T_SEALED.csv",
-      "commitment_field": "sealed_files.labels_T_SEALED.csv"
+  "logical_label_objects": {
+    "T_adaptation_labels": {
+      "source": "private/labels_T_SEALED.csv",
+      "e2_role": "adaptation",
+      "expected_rows": 328,
+      "release_stage": "adaptation"
     },
-    {
-      "id": "private_label_summary",
+    "T_final_evaluation_labels": {
+      "source": "private/labels_T_SEALED.csv",
+      "e2_role": "final_evaluation",
+      "expected_rows": 1386,
+      "release_stage": "final_evaluation"
+    }
+  },
+  "custody_only_objects": {
+    "private_label_summary": {
       "source": "e0b_private",
       "relative_path": "private/label_summary_PRIVATE.json",
       "commitment_field": "private_summary_sha256"
     },
-    {
-      "id": "redemption_source",
+    "redemption_source": {
       "source": "source_manifest",
       "table": "coupon_redempt.csv",
       "reason": "can reconstruct primary Y1"
     },
-    {
-      "id": "transaction_source",
+    "transaction_source": {
       "source": "source_manifest",
       "table": "transaction_data.csv",
       "reason": "can reconstruct auxiliary Y2"
     },
-    {
-      "id": "original_archive",
+    "original_archive": {
       "source": "dataset_source",
       "path_field": "local_archive",
       "commitment_field": "archive_sha256",
       "reason": "can restore all outcome sources"
     }
-  ],
-  "receipt_required_fields": [
-    "schema_version",
-    "status",
-    "custodian_name",
-    "custodian_role",
-    "accepted_at",
-    "custodian_signing_key_fingerprint",
-    "executor_has_decryption_key",
-    "release_condition",
-    "objects"
+  },
+  "release_stages": {
+    "adaptation": {
+      "authorized_objects": ["T_adaptation_labels"],
+      "condition_id": "E1_E1a_predictions_frozen",
+      "condition": "all E1/E1a base and ablation predictions for adaptation and final-evaluation records are committed, pushed, and hash-registered before adaptation labels are released",
+      "required_prediction_sets": ["E1", "E1a"],
+      "allowed_delivery_modes": ["custodian_delivers_adaptation_labels"]
+    },
+    "final_evaluation": {
+      "authorized_objects": ["T_final_evaluation_labels"],
+      "condition_id": "E1_E1a_E2_predictions_frozen",
+      "condition": "all E1/E1a predictions and every approved E2 budget prediction are committed, pushed, and hash-registered before final evaluation; custodian-run evaluation is preferred over releasing row-level labels",
+      "required_prediction_sets": ["E1", "E1a", "E2"],
+      "allowed_delivery_modes": ["custodian_runs_frozen_evaluator", "release_row_level_labels_after_freeze"]
+    }
+  },
+  "plaintext_that_must_become_inaccessible_after_handoff": [
+    "private/labels_T_SEALED.csv",
+    "private/label_summary_PRIVATE.json",
+    "coupon_redempt.csv",
+    "transaction_data.csv",
+    "original_archive"
   ]
 }

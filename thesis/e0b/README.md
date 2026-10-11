@@ -19,9 +19,10 @@
 .venv/bin/python thesis/e0b/seal_labels.py thesis/e0b/runs/e0b-<timestamp>
 .venv/bin/python thesis/e0b/verify.py thesis/e0b/runs/e0b-<timestamp>
 .venv/bin/python thesis/e0b/lock_sources.py thesis/e0b/runs/e0b-<timestamp> --execute
+.venv/bin/python thesis/e0b/lock_sources.py thesis/e0b/runs/e0b-<timestamp> --check
 ```
 
-原始数据、家庭ID、权限清单、标签和逐条异常不上传GitHub。代码、方案、聚合结构审计及不含T结果的验收报告提交实验分支。八张解压CSV在2026-10-11后续加固中设为POSIX `0444`，防止日常误写；文件所有者仍可恢复写权限，所以这只是误操作防护，不是不可篡改或独立保管。任何源文件内容变化仍会导致登记哈希不一致。
+原始数据、家庭ID、权限清单、标签和逐条异常不上传GitHub。代码、方案、聚合结构审计及不含T结果的验收报告提交实验分支。八张解压CSV在2026-10-11后续加固中设为POSIX `0444`，主核验器会持续现场检查八表及压缩包共九项权限；文件所有者仍可恢复写权限，所以这只是误操作防护，不是不可篡改或独立保管。任何源文件内容变化仍会导致登记哈希不一致。
 
 跟踪的验收材料：
 
