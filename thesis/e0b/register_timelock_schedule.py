@@ -23,9 +23,9 @@ def register(policy, adaptation_at, final_at, beacon_state, contract_sha256):
     latest_round = beacon_state["latest"]["round"]
     latest_time = round_timestamp(timelock, latest_round)
     if adaptation_requested - latest_time < timelock["minimum_preparation_lead_seconds"]:
-        raise ValueError("adaptation unlock must be at least seven days after the live beacon round")
+        raise ValueError("adaptation unlock must be at least thirty minutes after the live beacon round")
     if final_requested - adaptation_requested < timelock["minimum_stage_separation_seconds"]:
-        raise ValueError("final unlock must be at least seven days after adaptation unlock")
+        raise ValueError("final unlock must be at least thirty minutes after adaptation unlock")
     requested = {"adaptation": adaptation_requested, "final_evaluation": final_requested}
     for stage, timestamp in requested.items():
         round_number = first_round_at_or_after(timelock, timestamp)

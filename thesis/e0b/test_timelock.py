@@ -65,8 +65,8 @@ def pending_policy():
             "public_key": "83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a",
             "genesis_time": 1692803367,
             "period_seconds": 3,
-            "minimum_preparation_lead_seconds": 604800,
-            "minimum_stage_separation_seconds": 604800,
+            "minimum_preparation_lead_seconds": 1800,
+            "minimum_stage_separation_seconds": 1800,
             "schedule_registration": None,
             "stages": {
                 "adaptation": {"requested_unlock_at_utc": None, "unlock_at_utc": None, "round": None},
@@ -202,9 +202,9 @@ class TimelockPolicyTests(unittest.TestCase):
         latest_round = 100
         latest_time = round_timestamp(policy["timelock"], latest_round)
         state = {"latest": {"round": latest_round, "randomness": "a", "signature": "b"}}
-        with self.assertRaisesRegex(ValueError, "seven days after the live"):
+        with self.assertRaisesRegex(ValueError, "thirty minutes after the live"):
             register(policy, utc_text(latest_time + 60), utc_text(latest_time + 700000), state, "a" * 64)
-        with self.assertRaisesRegex(ValueError, "seven days after adaptation"):
+        with self.assertRaisesRegex(ValueError, "thirty minutes after adaptation"):
             register(policy, utc_text(latest_time + 700000), utc_text(latest_time + 700060), state, "a" * 64)
 
     def test_schedule_registration_is_one_time_only(self):

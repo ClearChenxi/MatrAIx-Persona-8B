@@ -91,7 +91,7 @@ def prepare(policy_path, run_dir, output_dir, repository, tle_path, beacon_state
     adaptation_round = timelock["stages"]["adaptation"]["round"]
     lead = (adaptation_round - latest_round) * timelock["period_seconds"]
     if lead < timelock["minimum_preparation_lead_seconds"]:
-        raise ValueError("adaptation round is no longer at least seven days in the future")
+        raise ValueError("adaptation round is no longer at least thirty minutes in the future")
 
     commitments = source_commitments(run_dir)
     label_path = run_dir / "private/labels_T_SEALED.csv"
