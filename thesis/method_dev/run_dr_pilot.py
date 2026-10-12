@@ -158,8 +158,15 @@ def ap(y: list[int], p: list[float]) -> float | None:
     return total / positives
 
 
-def run_variant(rows: list[dict], variant: str, output_dir: Path) -> list[dict]:
+def append_event(path: Path, event: dict) -> None:
+    with path.open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+        stream.flush()
+
+
+def run_variant(rows: list[dict], split: str, variant: str, output_dir: Path) -> list[dict]:
     results = []
+    event_path = output_dir / "events.jsonl"
     for row in rows:
         messages = [
             {"role": "system", "content": "Return only the requested JSON. Do not invent facts."},
@@ -174,6 +181,12 @@ def run_variant(rows: list[dict], variant: str, output_dir: Path) -> list[dict]:
         for attempt in range(1, 4):
             value, record = call_ollama(request, attempt)
             attempts.append(record)
+            append_event(event_path, {
+                "split": split, "variant": variant, "row_id": row["row_id"],
+                "campaign": row["campaign"], "attempt": attempt,
+                "request_sha256": digest(json.dumps(request, ensure_ascii=False, sort_keys=True)),
+                "result": record,
+            })
             if value is not None:
                 break
         results.append({"row_id": row["row_id"], "campaign": row["campaign"], "label": row["label"],
@@ -202,7 +215,7 @@ def main() -> None:
     }, indent=2), encoding="utf-8")
     all_results = {"D": {}, "R": {}}
     for variant in PROMPTS:
-        all_results["D"][variant] = run_variant(selected_d, variant, destination)
+        all_results["D"][variant] = run_variant(selected_d, "D", variant, destination)
     d_scores = {}
     for variant, records in all_results["D"].items():
         by_campaign = defaultdict(list)
@@ -221,7 +234,7 @@ def main() -> None:
     if selected_variant is None:
         selected_variant = "v1"
         selection_status = "provisional_simplest_prompt_for_R_technical_checks_only"
-    all_results["R"][selected_variant] = run_variant(selected_r, selected_variant, destination)
+    all_results["R"][selected_variant] = run_variant(selected_r, "R", selected_variant, destination)
     (destination / "predictions.json").write_text(json.dumps(all_results, ensure_ascii=False), encoding="utf-8")
     summary = {"model": MODEL, "selected_variant": selected_variant,
                "prompt_selection_status": selection_status, "D_macro_AP": d_scores,

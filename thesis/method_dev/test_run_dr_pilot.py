@@ -28,6 +28,13 @@ class PilotTests(unittest.TestCase):
         self.assertEqual([row["row_id"] for row in first], [row["row_id"] for row in second])
         self.assertEqual(len(first), run_dr_pilot.PILOT_R)
 
+    def test_events_are_appended_immediately(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "events.jsonl"
+            run_dr_pilot.append_event(path, {"attempt": 1})
+            run_dr_pilot.append_event(path, {"attempt": 2})
+            self.assertEqual(path.read_text().count("\n"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
