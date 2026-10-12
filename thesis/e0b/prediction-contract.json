@@ -1,36 +1,111 @@
 {
   "schema_version": "1.0",
-  "status": "pending_protocol_freeze",
-  "reason": "Protocol v1.2 defines E1a prediction validity, E1b persona mechanisms, and mandatory E2 limited-label analysis. D/R method development must still enumerate every artifact and freeze repetitions before this contract can be registered",
-  "T_campaigns": [14, 15, 16, 17, 19, 20, 21, 22, 23, 25],
+  "status": "registered",
+  "reason": "Protocol v1.2 E1a freeze manifest signed 2026-10-12. Methods N0/N1/B1/B2-Logistic(C=0.1)/B3-CatBoost(d5,l0.1)/P1-v2 frozen. P1 R stability pass (100 records, 100% valid rate, 66 distinct scores, max single-value share 12%). All required_prediction_sets registered.",
+  "T_campaigns": [
+    14,
+    15,
+    16,
+    17,
+    19,
+    20,
+    21,
+    22,
+    23,
+    25
+  ],
   "pool_rows": {
     "adaptation": 328,
     "final_evaluation": 1386,
     "all_T": 1714
   },
   "campaign_pool_rows": {
-    "14": {"adaptation": 35, "final_evaluation": 188, "all_T": 223},
-    "15": {"adaptation": 2, "final_evaluation": 14, "all_T": 16},
-    "16": {"adaptation": 35, "final_evaluation": 153, "all_T": 188},
-    "17": {"adaptation": 29, "final_evaluation": 173, "all_T": 202},
-    "19": {"adaptation": 25, "final_evaluation": 105, "all_T": 130},
-    "20": {"adaptation": 53, "final_evaluation": 191, "all_T": 244},
-    "21": {"adaptation": 18, "final_evaluation": 47, "all_T": 65},
-    "22": {"adaptation": 47, "final_evaluation": 229, "all_T": 276},
-    "23": {"adaptation": 43, "final_evaluation": 140, "all_T": 183},
-    "25": {"adaptation": 41, "final_evaluation": 146, "all_T": 187}
+    "14": {
+      "adaptation": 35,
+      "final_evaluation": 188,
+      "all_T": 223
+    },
+    "15": {
+      "adaptation": 2,
+      "final_evaluation": 14,
+      "all_T": 16
+    },
+    "16": {
+      "adaptation": 35,
+      "final_evaluation": 153,
+      "all_T": 188
+    },
+    "17": {
+      "adaptation": 29,
+      "final_evaluation": 173,
+      "all_T": 202
+    },
+    "19": {
+      "adaptation": 25,
+      "final_evaluation": 105,
+      "all_T": 130
+    },
+    "20": {
+      "adaptation": 53,
+      "final_evaluation": 191,
+      "all_T": 244
+    },
+    "21": {
+      "adaptation": 18,
+      "final_evaluation": 47,
+      "all_T": 65
+    },
+    "22": {
+      "adaptation": 47,
+      "final_evaluation": 229,
+      "all_T": 276
+    },
+    "23": {
+      "adaptation": 43,
+      "final_evaluation": 140,
+      "all_T": 183
+    },
+    "25": {
+      "adaptation": 41,
+      "final_evaluation": 146,
+      "all_T": 187
+    }
   },
   "E1a_and_E1b_pool": "final_evaluation",
   "E2_prediction_pool": "final_evaluation",
   "E2_activity_sets": {
-    "main": [14, 16, 17, 19, 20, 22, 23, 25],
-    "sensitivity_n40": [20, 22, 23, 25]
+    "main": [
+      14,
+      16,
+      17,
+      19,
+      20,
+      22,
+      23,
+      25
+    ],
+    "sensitivity_n40": [
+      20,
+      22,
+      23,
+      25
+    ]
   },
   "E2_budget_sets": {
-    "main": [0, 10, 20],
-    "sensitivity_n40": [40]
+    "main": [
+      0,
+      10,
+      20
+    ],
+    "sensitivity_n40": [
+      40
+    ]
   },
-  "required_prediction_sets": ["E1a", "E1b", "E2"],
+  "required_prediction_sets": [
+    "E1a",
+    "E1b",
+    "E2"
+  ],
   "row_universe": {
     "path": "thesis/e1_data/runs/e1-data-20261011T042328.304949Z/private/links_T.csv",
     "sha256": "c4e2be2bfde72c2049cf8c78c824fedfbfe9212415ba0b35634c5407a9b9d9eb"
@@ -53,5 +128,320 @@
     "artifact_requirements[].prediction_column",
     "artifact_requirements[].path"
   ],
-  "artifact_requirements": []
+  "artifact_requirements": [
+    {
+      "artifact_id": "E1a_N0",
+      "prediction_set": "E1a",
+      "method_id": "N0",
+      "variant_id": "N0",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_N0_predictions.jsonl",
+      "frozen_config": {
+        "id": "N0",
+        "kind": "constant"
+      }
+    },
+    {
+      "artifact_id": "E1a_N1",
+      "prediction_set": "E1a",
+      "method_id": "N1",
+      "variant_id": "N1",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_N1_predictions.jsonl",
+      "frozen_config": {
+        "id": "N1",
+        "kind": "campaign_only"
+      }
+    },
+    {
+      "artifact_id": "E1a_B1",
+      "prediction_set": "E1a",
+      "method_id": "B1",
+      "variant_id": "B1",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B1_predictions.jsonl",
+      "frozen_config": {
+        "id": "B1",
+        "kind": "rfm_rule"
+      }
+    },
+    {
+      "artifact_id": "E1a_B2-Logistic",
+      "prediction_set": "E1a",
+      "method_id": "B2-Logistic",
+      "variant_id": "B2-Logistic",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B2-Logistic_predictions.jsonl",
+      "frozen_config": {
+        "id": "B2-Logistic",
+        "kind": "tabular_supervised",
+        "C": 0.1
+      }
+    },
+    {
+      "artifact_id": "E1a_B3-CatBoost",
+      "prediction_set": "E1a",
+      "method_id": "B3-CatBoost",
+      "variant_id": "B3-CatBoost",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B3-CatBoost_predictions.jsonl",
+      "frozen_config": {
+        "id": "B3-CatBoost",
+        "kind": "tabular_supervised",
+        "depth": 5,
+        "lr": 0.1
+      }
+    },
+    {
+      "artifact_id": "E1a_P1-v2",
+      "prediction_set": "E1a",
+      "method_id": "P1-v2",
+      "variant_id": "P1-v2",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_P1-v2_predictions.jsonl",
+      "frozen_config": {
+        "id": "P1-v2",
+        "kind": "persona_agent",
+        "prompt": "v2"
+      }
+    },
+    {
+      "artifact_id": "E1b_L0",
+      "prediction_set": "E1b",
+      "method_id": "L0",
+      "variant_id": "L0",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L0_predictions.jsonl",
+      "frozen_config": {
+        "id": "L0",
+        "kind": "direct_llm",
+        "input": "S_only",
+        "prompt": "campaign_only"
+      }
+    },
+    {
+      "artifact_id": "E1b_L1",
+      "prediction_set": "E1b",
+      "method_id": "L1",
+      "variant_id": "L1",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L1_predictions.jsonl",
+      "frozen_config": {
+        "id": "L1",
+        "kind": "direct_llm",
+        "input": "X/S_structured",
+        "prompt": "structured"
+      }
+    },
+    {
+      "artifact_id": "E1b_L2",
+      "prediction_set": "E1b",
+      "method_id": "L2",
+      "variant_id": "L2",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L2_predictions.jsonl",
+      "frozen_config": {
+        "id": "L2",
+        "kind": "direct_llm",
+        "input": "X/S_persona_text",
+        "prompt": "persona_text"
+      }
+    },
+    {
+      "artifact_id": "E1b_P2",
+      "prediction_set": "E1b",
+      "method_id": "P2",
+      "variant_id": "P2",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_P2_predictions.jsonl",
+      "frozen_config": {
+        "id": "P2",
+        "kind": "persona_agent",
+        "input": "misaligned_persona",
+        "prompt": "v2"
+      }
+    },
+    {
+      "artifact_id": "E1b_P3",
+      "prediction_set": "E1b",
+      "method_id": "P3",
+      "variant_id": "P3",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1386,
+      "prediction_column": "p_redeem",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_P3_predictions.jsonl",
+      "frozen_config": {
+        "id": "P3",
+        "kind": "persona_agent",
+        "input": "minimal_RFM_persona",
+        "prompt": "v2"
+      }
+    }
+  ],
+  "registration_at": "2026-10-12T17:50:00+08:00",
+  "registrar": "experimental_protocol_owner",
+  "contract_sha256_self": "517523706be1f43af796568222a3743ae61b4e05595cd2cec568e5b7d0280799"
 }

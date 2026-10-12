@@ -21,18 +21,20 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
-def load_split(split: str) -> tuple[list[dict], list[dict], dict[str, int]]:
+def load_split(split: str) -> tuple[list[dict], dict[str, int] | None, dict[str, int]]:
     """Return (features, labels, link_map) for D/R/T.
 
     features: list of dict per row_id. JSON share columns are parsed into nested dicts.
-    labels:   y1_redeemed and y2 mapped per row_id.
+    labels:   y1_redeemed per row_id. None for T (sealed).
     link_map: row_id -> {household_key, campaign, split, e2_role}.
     """
     feats = _read_csv(E1_RUN / f"features_{split}.csv")
-    labs = _read_csv(E1_RUN / f"labels_{split}.csv")
+    labels_path = E1_RUN / f"labels_{split}.csv"
+    label_map: dict[str, int] | None = None
+    if labels_path.exists():
+        labs = _read_csv(labels_path)
+        label_map = {r["row_id"]: int(r["y1_redeemed"]) for r in labs}
     links = _read_csv(E1_RUN / f"links_{split}.csv")
-
-    label_map = {r["row_id"]: int(r["y1_redeemed"]) for r in labs}
     link_map = {r["row_id"]: r for r in links}
 
     # Parse JSON share columns (kept as nested dict in feature row)
