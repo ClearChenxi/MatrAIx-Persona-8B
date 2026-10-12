@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 import run_dr_pilot
+import run_d_prompt_compare
 
 
 class PilotTests(unittest.TestCase):
@@ -34,6 +35,20 @@ class PilotTests(unittest.TestCase):
             run_dr_pilot.append_event(path, {"attempt": 1})
             run_dr_pilot.append_event(path, {"attempt": 2})
             self.assertEqual(path.read_text().count("\n"), 2)
+
+    def test_full_d_contract_and_request_are_fixed(self):
+        rows = run_dr_pilot.load_split("D")
+        self.assertEqual(len(rows), 729)
+        request = run_d_prompt_compare._request(rows[0], "v1")
+        self.assertEqual(request["options"]["temperature"], 0)
+        self.assertEqual(request["options"]["num_ctx"], 8192)
+        self.assertEqual(request["options"]["num_predict"], 64)
+        self.assertFalse(request["think"])
+
+    def test_prompt_hash_is_stable(self):
+        first = run_d_prompt_compare.pilot.digest(run_d_prompt_compare.pilot.PROMPTS["v1"])
+        second = run_d_prompt_compare.pilot.digest(run_d_prompt_compare.pilot.PROMPTS["v1"])
+        self.assertEqual(first, second)
 
 
 if __name__ == "__main__":
