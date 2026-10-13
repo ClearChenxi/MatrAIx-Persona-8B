@@ -2,7 +2,7 @@
   "schema_version": "3.0",
   "status": "E1a_E1b_predictions_frozen",
   "frozen_at_utc": "2026-10-13T01:30:00Z",
-  "code_commit": "PLACEHOLDER",
+  "code_commit": "8a535eeb757f9fe1af11f9f0f50c5edaff8aecb1",
   "code_committed_and_pushed": true,
   "timelock_seal_manifest_sha256": "753eef61debc68e052350fdd73b8ca7203059aa426af26d16ab1ee839b5bf042",
   "prediction_contract_sha256": "3de91fb81f8c49b69bd2b3b62fdb0cda39e717ee2a3a8c463b5f6c7e4bf825e3",
