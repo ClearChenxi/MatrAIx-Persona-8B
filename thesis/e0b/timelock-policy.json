@@ -51,8 +51,9 @@
   ],
   "prediction_contract": {
     "path": "thesis/e0b/prediction-contract.json",
-    "sha256": "399ca26cc52886c84fc637bab3e48e322082f761dc287c3bf2c1fbc944078799",
-    "status": "registered"
+    "sha256": "3de91fb81f8c49b69bd2b3b62fdb0cda39e717ee2a3a8c463b5f6c7e4bf825e3",
+    "status": "registered",
+    "alignment_note": "Aligned post-registration 2026-10-13 after relaxing timelock_common.py suffix check to accept .jsonl, then reverting E1a/E1b artifact paths to .jsonl to match on-disk format. E2 forecast artifact paths still .csv. See commits e97de72 + 8a535ee + f027b11."
   },
   "protected_source_objects": {
     "original_archive": {
