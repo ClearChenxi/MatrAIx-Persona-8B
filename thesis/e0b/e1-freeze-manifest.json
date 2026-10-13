@@ -1,0 +1,75 @@
+{
+  "schema_version": "3.0",
+  "status": "E1a_E1b_predictions_frozen",
+  "frozen_at_utc": "2026-10-13T01:30:00Z",
+  "code_commit": "dd6e73e498d047349917d07d2909ea1856805ba1",
+  "code_committed_and_pushed": true,
+  "timelock_seal_manifest_sha256": "753eef61debc68e052350fdd73b8ca7203059aa426af26d16ab1ee839b5bf042",
+  "prediction_contract_sha256": "399ca26cc52886c84fc637bab3e48e322082f761dc287c3bf2c1fbc944078799",
+  "prediction_sets": [
+    "E1a",
+    "E1b"
+  ],
+  "artifacts": [
+    {
+      "artifact_id": "E1a_N0",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_N0_predictions.csv",
+      "sha256": "74b08e1fbae921ed50bd3d113584d565362cab663aba4cb88050fe94facb1508"
+    },
+    {
+      "artifact_id": "E1a_N1",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_N1_predictions.csv",
+      "sha256": "63fac0ed057057416166ebca8e3fbc71126948bcd275d433cb81776b4eb4b6cc"
+    },
+    {
+      "artifact_id": "E1a_B1",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B1_predictions.csv",
+      "sha256": "6087a12efee396fe27ba1a955c3f4c7afa98c4cd04e3f485a427a15ae30a2dff"
+    },
+    {
+      "artifact_id": "E1a_B2-Logistic",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B2-Logistic_predictions.csv",
+      "sha256": "97b36e9e087310c52a5235e960fa7c6bd6e661e493fc41d3b561f1c2ffa05b17"
+    },
+    {
+      "artifact_id": "E1a_B3-CatBoost",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B3-CatBoost_predictions.csv",
+      "sha256": "bc6a807be2646c20dde302aafd8a2f799e561fb665a9ebbca28754c83d260799"
+    },
+    {
+      "artifact_id": "E1a_P1-v2",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_P1-v2_predictions.csv",
+      "sha256": "47a3afb2a9f81dbe5beb227ac8319dc5b172247b92c4426955cbe8c9875f19f7"
+    },
+    {
+      "artifact_id": "E1b_L0",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L0_predictions.csv",
+      "sha256": "870be4f101aff49de120057b91a68ad5d44feff2c8c7203bfebf8145d2c67086"
+    },
+    {
+      "artifact_id": "E1b_L1",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L1_predictions.csv",
+      "sha256": "078326b60f956a7e8cb2fab75a47efbb0245fb626a1b76457105b697a02f5420"
+    },
+    {
+      "artifact_id": "E1b_L2",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L2_predictions.csv",
+      "sha256": "34e26bc4f924405c65f5d650c70b30586a6c58c2a608cbc0959429274f1d253e"
+    },
+    {
+      "artifact_id": "E1b_P2",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_P2_predictions.csv",
+      "sha256": "f17cb55c29b839c16889f19f818fa34f2f9713234ddb9daabfb3e83f8cc781c7"
+    },
+    {
+      "artifact_id": "E1b_P3",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_P3_predictions.csv",
+      "sha256": "64a3973690bbb0255f4ff2add43a88b95dae515c436d780cd8c6ea2d23c5ddc9"
+    }
+  ],
+  "public_time_attestation": {
+    "repository": "ClearChenxi/MatrAIx-Persona-8B",
+    "signer_workflow": "github.com/ClearChenxi/MatrAIx-Persona-8B/.github/workflows/attest-prediction-freeze.yml",
+    "bundle": "thesis/e0b/attestations/e1-freeze-bundle.jsonl"
+  }
+}
