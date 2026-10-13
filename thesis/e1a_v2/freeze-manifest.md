@@ -1,6 +1,12 @@
 # E1a 协议冻结记录（Protocol Freeze Manifest）
 
-版本：v1.0 · 日期：2026-10-12 · 状态：**待签字**
+版本：v1.0 · 日期：2026-10-12 · 状态：**待签字 / 历史草稿，2026-10-13 已被冻结**
+
+> **注意（2026-10-13）**：本版本是 2026-10-12 在旧 `thesis/method_dev/` 上下文里写的草稿；它的实现侧（裸 `urllib.request` + 手写 prompt）已被发现问题（详见 `archive/method_dev/DEPRECATED.md`），方法学声明与实现不一致。本文件保留为历史草稿，下面的代码路径（如 `thesis/method_dev/methods/run_baselines.py`）现在已经迁移到 `archive/method_dev/methods/`，但其中只有基线代码仍然是合规的真实传统方法实现，**LLM 相关实现必须丢弃**。
+>
+> 新的 v2 版 freeze manifest 正在 `thesis/e1a_v2/freeze-manifest.md` 顶部重写——必须等到 E1a_v2 真 PersonaJsonSurvey workflow 跑通后按真实数据再冻结。**现阶段请勿把本文当作可签字的 E1a 协议冻结记录。**
+
+---
 
 本记录对应论文实验手册 步骤 20。一旦签字，所有 T 预测严格按此清单执行；任何修改必须按"冻结表变更流程"逐项记录。
 
