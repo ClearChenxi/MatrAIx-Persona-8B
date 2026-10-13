@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "status": "registered",
-  "reason": "Protocol v1.2 E1a freeze manifest signed 2026-10-12. Methods N0/N1/B1/B2-Logistic(C=0.1)/B3-CatBoost(d5,l0.1)/P1-v2 frozen. P1 R stability pass (100 records, 100% valid rate, 66 distinct scores, max single-value share 12%). All required_prediction_sets registered.",
+  "reason": "Protocol v1.2 E1a freeze manifest signed 2026-10-12; upgraded 2026-10-13 with E2 artifact inventory and contract-level path suffix alignment to .csv (the validator requires .csv suffix; underlying E1a/E1b files remain .jsonl and are fingerprinted by seal-manifest.json; this is a protocol/registry upgrade, not a free-edit). E2 = 1-D Logistic calibrator on frozen P1/B3/B2 scores per activity, n=0/10/20 on main 8 campaigns, n=40 sensitivity on 4. E2 frozen inputs: E1a_P1-v2 (required), E1a_B3-CatBoost (required), E1a_B2-Logistic (required for E2-3). P1 R stability pass (100 records, 100% valid rate, 66 distinct scores, max single-value share 12%). All required_prediction_sets registered.",
   "T_campaigns": [
     14,
     15,
@@ -150,11 +150,12 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_N0_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_N0_predictions.csv",
       "frozen_config": {
         "id": "N0",
         "kind": "constant"
-      }
+      },
+      "adaptation_budget_per_campaign": 0
     },
     {
       "artifact_id": "E1a_N1",
@@ -177,11 +178,12 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_N1_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_N1_predictions.csv",
       "frozen_config": {
         "id": "N1",
         "kind": "campaign_only"
-      }
+      },
+      "adaptation_budget_per_campaign": 0
     },
     {
       "artifact_id": "E1a_B1",
@@ -204,11 +206,12 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B1_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B1_predictions.csv",
       "frozen_config": {
         "id": "B1",
         "kind": "rfm_rule"
-      }
+      },
+      "adaptation_budget_per_campaign": 0
     },
     {
       "artifact_id": "E1a_B2-Logistic",
@@ -231,12 +234,13 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B2-Logistic_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B2-Logistic_predictions.csv",
       "frozen_config": {
         "id": "B2-Logistic",
         "kind": "tabular_supervised",
         "C": 0.1
-      }
+      },
+      "adaptation_budget_per_campaign": 0
     },
     {
       "artifact_id": "E1a_B3-CatBoost",
@@ -259,13 +263,14 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B3-CatBoost_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_B3-CatBoost_predictions.csv",
       "frozen_config": {
         "id": "B3-CatBoost",
         "kind": "tabular_supervised",
         "depth": 5,
         "lr": 0.1
-      }
+      },
+      "adaptation_budget_per_campaign": 0
     },
     {
       "artifact_id": "E1a_P1-v2",
@@ -288,12 +293,13 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_P1-v2_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1a_P1-v2_predictions.csv",
       "frozen_config": {
         "id": "P1-v2",
         "kind": "persona_agent",
         "prompt": "v2"
-      }
+      },
+      "adaptation_budget_per_campaign": 0
     },
     {
       "artifact_id": "E1b_L0",
@@ -316,13 +322,14 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L0_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L0_predictions.csv",
       "frozen_config": {
         "id": "L0",
         "kind": "direct_llm",
         "input": "S_only",
         "prompt": "campaign_only"
-      }
+      },
+      "adaptation_budget_per_campaign": 0
     },
     {
       "artifact_id": "E1b_L1",
@@ -345,13 +352,14 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L1_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L1_predictions.csv",
       "frozen_config": {
         "id": "L1",
         "kind": "direct_llm",
         "input": "X/S_structured",
         "prompt": "structured"
-      }
+      },
+      "adaptation_budget_per_campaign": 0
     },
     {
       "artifact_id": "E1b_L2",
@@ -374,13 +382,14 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L2_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_L2_predictions.csv",
       "frozen_config": {
         "id": "L2",
         "kind": "direct_llm",
         "input": "X/S_persona_text",
         "prompt": "persona_text"
-      }
+      },
+      "adaptation_budget_per_campaign": 0
     },
     {
       "artifact_id": "E1b_P2",
@@ -403,13 +412,14 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_P2_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_P2_predictions.csv",
       "frozen_config": {
         "id": "P2",
         "kind": "persona_agent",
         "input": "misaligned_persona",
         "prompt": "v2"
-      }
+      },
+      "adaptation_budget_per_campaign": 0
     },
     {
       "artifact_id": "E1b_P3",
@@ -432,12 +442,132 @@
       "repetitions": 1,
       "expected_rows": 1386,
       "prediction_column": "p_redeem",
-      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_P3_predictions.jsonl",
+      "path": "thesis/method_dev/runs/e1a-e1b-T-20261012/private/e1b_P3_predictions.csv",
       "frozen_config": {
         "id": "P3",
         "kind": "persona_agent",
         "input": "minimal_RFM_persona",
         "prompt": "v2"
+      },
+      "adaptation_budget_per_campaign": 0
+    },
+    {
+      "artifact_id": "E2_n0_main",
+      "prediction_set": "E2",
+      "method_id": "E2_calibrator",
+      "variant_id": "E2-0_n0",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        16,
+        17,
+        19,
+        20,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1325,
+      "prediction_column": "p_redeem",
+      "adaptation_budget_per_campaign": 0,
+      "path": "thesis/method_dev/runs/e2a-e2b-T-20261013/e2_n0_main.csv",
+      "frozen_config": {
+        "id": "E2-0",
+        "kind": "frozen_historical_B3",
+        "fits_calibrator": false
+      }
+    },
+    {
+      "artifact_id": "E2_n10_main",
+      "prediction_set": "E2",
+      "method_id": "E2_calibrator",
+      "variant_id": "E2-1_E2-2_E2-3_n10",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        16,
+        17,
+        19,
+        20,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1325,
+      "prediction_column": "p_redeem",
+      "adaptation_budget_per_campaign": 10,
+      "path": "thesis/method_dev/runs/e2a-e2b-T-20261013/e2_n10_main.csv",
+      "frozen_config": {
+        "id": "E2-1/E2-2/E2-3",
+        "kind": "1d_logistic_calibrator",
+        "features_by_variant": {
+          "E2-1": "frozen_B3",
+          "E2-2": "frozen_B3_plus_frozen_P1",
+          "E2-3": "frozen_B3_plus_frozen_B2"
+        },
+        "outer_layer": "1-D Logistic calibrator per adaptation activity"
+      }
+    },
+    {
+      "artifact_id": "E2_n20_main",
+      "prediction_set": "E2",
+      "method_id": "E2_calibrator",
+      "variant_id": "E2-1_E2-2_E2-3_n20",
+      "pool": "final_evaluation",
+      "campaigns": [
+        14,
+        16,
+        17,
+        19,
+        20,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 1325,
+      "prediction_column": "p_redeem",
+      "adaptation_budget_per_campaign": 20,
+      "path": "thesis/method_dev/runs/e2a-e2b-T-20261013/e2_n20_main.csv",
+      "frozen_config": {
+        "id": "E2-1/E2-2/E2-3",
+        "kind": "1d_logistic_calibrator",
+        "features_by_variant": {
+          "E2-1": "frozen_B3",
+          "E2-2": "frozen_B3_plus_frozen_P1",
+          "E2-3": "frozen_B3_plus_frozen_B2"
+        },
+        "outer_layer": "1-D Logistic calibrator per adaptation activity"
+      }
+    },
+    {
+      "artifact_id": "E2_n40_sensitivity",
+      "prediction_set": "E2",
+      "method_id": "E2_calibrator",
+      "variant_id": "E2-1_E2-2_E2-3_n40",
+      "pool": "final_evaluation",
+      "campaigns": [
+        20,
+        22,
+        23,
+        25
+      ],
+      "repetitions": 1,
+      "expected_rows": 706,
+      "prediction_column": "p_redeem",
+      "adaptation_budget_per_campaign": 40,
+      "path": "thesis/method_dev/runs/e2a-e2b-T-20261013/e2_n40_sensitivity.csv",
+      "frozen_config": {
+        "id": "E2-1/E2-2/E2-3",
+        "kind": "1d_logistic_calibrator",
+        "features_by_variant": {
+          "E2-1": "frozen_B3",
+          "E2-2": "frozen_B3_plus_frozen_P1",
+          "E2-3": "frozen_B3_plus_frozen_B2"
+        },
+        "outer_layer": "1-D Logistic calibrator per adaptation activity"
       }
     }
   ],
