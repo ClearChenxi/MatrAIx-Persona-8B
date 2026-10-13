@@ -250,9 +250,9 @@ def validate_prediction_contract_file(path, repository=None):
             raise ValueError("prediction contract method, variant, and path must be explicit")
         if (
             record["path"] in paths or Path(record["path"]).is_absolute()
-            or ".." in Path(record["path"]).parts or Path(record["path"]).suffix.lower() != ".csv"
+            or ".." in Path(record["path"]).parts or Path(record["path"]).suffix.lower() not in (".csv", ".jsonl")
         ):
-            raise ValueError("prediction artifact paths must be unique repository-relative paths")
+            raise ValueError("prediction artifact paths must be unique repository-relative paths under the repository with a .csv or .jsonl suffix")
         paths.add(record["path"])
         record_campaigns = record.get("campaigns")
         if not isinstance(record_campaigns, list) or not record_campaigns or not set(record_campaigns) <= set(campaigns):
