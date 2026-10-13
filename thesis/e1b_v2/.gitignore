@@ -1,0 +1,18 @@
+# Local run artifacts (timestamped UTC folders under runs/)
+runs/
+
+# Private / sealed source — must not enter public Git
+private/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local Ollama request / response traces
+*.log
+logs/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/

@@ -1,3 +1,15 @@
+# ---------------------------------------------------------------------------
+# MOVED FROM: thesis/method_dev/methods/io_utils.py
+# DATE:       2026-10-13
+# REASON:     Baseline N0/N1/B1/B2/B3 是真实传统方法实现，与 method_dev/ 的
+#             LLM 调用上下文无关，可安全复用。本文件已脱离 method_dev/ 调用链。
+# ISOLATION:  本文件不再 import method_dev/ 下任何模块；不接受 method_dev/ 的
+#             调用方反向引用。审计方法见 ../ISOLATION.md。
+# COMPATIBILITY: load_split / E1_RUN 常量已在 io_utils.py 中改为相对 thesis/
+#                仓库根解析，不再硬编码 method_dev 路径。import 时如发现 E1_RUN
+#                解析异常，请核对 thesis/e1_data/runs/<run-id>/ 是否存在。
+# ---------------------------------------------------------------------------
+
 """Shared I/O utilities for E1a methods (B1/B2/B3/N0/N1).
 
 Loads D/R/T features, labels, and links from the frozen e1_data run directory.
@@ -10,10 +22,18 @@ import json
 from pathlib import Path
 from typing import Any
 
-E1_RUN = Path(
-    "/Users/jiangchenxi/科研内容/代码仓库/MatrAIx-Persona-8B/thesis/e1_data/runs/"
-    "e1-data-20261011T042328.304949Z/private"
+# Frozen e1_data run (already E0b-accepted, no method_dev dependency).
+# Resolved from the repository root so e1a_v2/ does not import anything from
+# thesis/method_dev/. To override (e.g. point to a re-frozen input bundle),
+# set THESIS_E1_RUN env var to an absolute path.
+import os  # noqa: E402
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]  # thesis/e1a_v2/methods/io_utils.py → repo root
+_DEFAULT = (
+    _REPO_ROOT
+    / "thesis/e1_data/runs/e1-data-20261011T042328.304949Z/private"
 )
+E1_RUN = Path(os.environ.get("THESIS_E1_RUN", str(_DEFAULT)))
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:

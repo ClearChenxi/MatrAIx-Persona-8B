@@ -1,3 +1,15 @@
+# ---------------------------------------------------------------------------
+# MOVED FROM: thesis/method_dev/methods/baseline_catboost.py
+# DATE:       2026-10-13
+# REASON:     Baseline N0/N1/B1/B2/B3 是真实传统方法实现，与 method_dev/ 的
+#             LLM 调用上下文无关，可安全复用。本文件已脱离 method_dev/ 调用链。
+# ISOLATION:  本文件不再 import method_dev/ 下任何模块；不接受 method_dev/ 的
+#             调用方反向引用。审计方法见 ../ISOLATION.md。
+# COMPATIBILITY: load_split / E1_RUN 常量已在 io_utils.py 中改为相对 thesis/
+#                仓库根解析，不再硬编码 method_dev 路径。import 时如发现 E1_RUN
+#                解析异常，请核对 thesis/e1_data/runs/<run-id>/ 是否存在。
+# ---------------------------------------------------------------------------
+
 """B3: CatBoost on the same 56-field X/S schema.
 
 Per 手册 step 16, candidates are depth {3, 5} x learning_rate {0.03, 0.1},
@@ -11,7 +23,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from io_utils import (  # noqa: E402
+from io_utils import (  # noqa: E402  # e1a_v2 local — not method_dev/
     brier,
     load_split,
     per_campaign_macro_ap,

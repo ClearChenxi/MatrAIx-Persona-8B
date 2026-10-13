@@ -42,3 +42,17 @@ htmlcov/
 .env.*
 *.pem
 *.key
+
+# Archived / deprecated materials — kept on disk for audit but not in source
+# control. The contents are documented in DEPRECATED.md / ISOLATION.md inside
+# each subdirectory. New experiments MUST NOT import anything from here.
+#
+# Currently tracks:
+#   archive/method_dev/  — frozen 2026-10-13; reasons in
+#                          archive/method_dev/DEPRECATED.md
+#
+# Allow only top-level README / ISOLATION / DEPRECATED *.md inside archive/
+# so editors / readers can navigate without re-importing the scripts.
+archive/
+!archive/README.md
+!archive/**/*.md
