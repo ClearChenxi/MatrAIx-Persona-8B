@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
+from importlib.metadata import version
 from pathlib import Path
 
 import joblib
@@ -104,6 +106,9 @@ def main() -> None:
         "code_commit": commit,
         "input_run": config["input_run"],
         "input_hashes": config["input_hashes"],
+        "runtime": {"python": sys.version, "scikit_learn": version("scikit-learn"),
+                    "catboost": version("catboost"), "numpy": version("numpy"),
+                    "pandas": version("pandas")},
         "model_selection": {"B2": b2.selection, "B3": b3.selection},
         "n0_rate": n0,
         "rows": {"D": len(D.features), "R": len(R.features)},

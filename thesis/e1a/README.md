@@ -18,6 +18,10 @@ The model-specific packages are pinned in `requirements.txt` and installed
 into the branch's independent `.venv` from the local cache. Upstream
 MatrAIx source files are not modified.
 
+After a D/R run, `python -m thesis.e1a.verify_development <run-directory>`
+checks every artifact hash and replays all five method outputs on D/R. The
+runtime manifest records the exact additional model-library versions.
+
 Status: code and synthetic tests are in preparation. There is no T prediction
 or final evaluation in this directory. The parent experiment and conclusion
 limits are fixed by `../experiment-blueprint/`.
