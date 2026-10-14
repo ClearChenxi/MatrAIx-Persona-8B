@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from thesis.e1b.agent_workflow import (
@@ -50,6 +51,7 @@ def run_direct_batch(
         raise ValueError("invalid direct LLM condition or retry count")
     if not 0 <= fallback_rate <= 1:
         raise ValueError("invalid historical fallback rate")
+    os.umask(0o077)
     destination.mkdir(parents=True, exist_ok=False)
     e0a_run.bootstrap()
     task = build_task(rows, destination)

@@ -21,7 +21,9 @@ The direct L0/L1/L2 call primitive, same-activity P2 donor matching and P3
 RFM field reduction are implemented and covered by synthetic tests. L2 uses
 exactly the same model-visible messages as P1; the only difference is the
 Agent execution path. Therefore a deterministic equal-score result cannot be
-relabelled as an Agent workflow advantage. The full condition runner, P4
-frozen subset, historical calibration and final prediction contract remain
-to be implemented. No T prediction, new timelock seal or final outcome
-evaluation has occurred.
+relabelled as an Agent workflow advantage. `condition_pilot.py` prepares D/R
+comparisons for all six conditions; execution is locked pending P1's D/R
+technical gate. `subsample.py` defines the label-free paired P4 selector;
+its per-activity cap is not yet frozen. Historical calibration, the formal
+T runner and prediction contract remain to be implemented. No T prediction,
+new timelock seal or final outcome evaluation has occurred.

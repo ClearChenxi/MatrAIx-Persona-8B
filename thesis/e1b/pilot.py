@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import os
 import subprocess
 import time
 from collections import Counter, defaultdict
@@ -111,6 +112,7 @@ def run(split_name: str, pilot_config: dict, input_config: dict) -> dict:
     by_campaign = defaultdict(list)
     for row in rows:
         by_campaign[int(split.links[row["row_id"]]["campaign"])].append(row)
+    os.umask(0o077)
     destination = HERE / "runs" / datetime.now(timezone.utc).strftime(f"pilot-{split_name}-%Y%m%dT%H%M%S.%fZ")
     destination.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()

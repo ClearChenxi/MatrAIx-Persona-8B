@@ -100,6 +100,7 @@ def run_persona_batch(
         raise ValueError("invalid fallback or retry policy")
     if method_id not in {"P1", "P2", "P3"}:
         raise ValueError("only Persona Agent conditions use this runner")
+    os.umask(0o077)
     destination.mkdir(parents=True, exist_ok=False)
     e0a_run.bootstrap()
     task = build_task(rows, destination)
