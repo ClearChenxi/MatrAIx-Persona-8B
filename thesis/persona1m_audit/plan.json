@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "status": "approved_metadata_only_matchability_audit",
+  "dataset_repo": "MatrAIx2026/MatrAIx_Persona_1M_Public_Release",
+  "dataset_revision": "8b1073ab23d0c0ba0928386a041bac55e5365ddc",
+  "metadata_sha256": {
+    "README.md": "979506a40a74d29bbd08d88047fa9952246b52548c571c022fbf3b3b63ba21f6",
+    "persona_codes.schema.json": "a02221ff32c2bc135c5e4290e1383081188712ee88f5c341f5fdb56d3d7b1c5c",
+    "audit.json": "74264580a873240896c1954fa053af6cbd6da38be8599dcd504ef13ac965dd82"
+  },
+  "expected_persona_rows": 999847,
+  "expected_persona_fields": 1290,
+  "dunnhumby_splits": ["D", "R"],
+  "bridges": [
+    {
+      "persona_field": "lstyle_shopping_style",
+      "dunnhumby_fields": ["basket_count", "coupon_discount_basket_share"],
+      "relation": "unvalidated_proxy",
+      "reason": "Observed household shopping frequency and coupon-discount incidence do not identify an individual's shopping style."
+    },
+    {
+      "persona_field": "lstyle_frugality",
+      "dunnhumby_fields": ["sales_total", "retail_discount_basket_share"],
+      "relation": "unvalidated_proxy",
+      "reason": "Observed household spend and retail-discount incidence do not identify an individual's saving attitude."
+    },
+    {
+      "persona_field": "pref_save_vs_spend",
+      "dunnhumby_fields": ["sales_total", "retail_discount_basket_share"],
+      "relation": "unvalidated_proxy",
+      "reason": "A categorical spending preference is not the same measurement as 84-day household sales or discounts."
+    },
+    {
+      "persona_field": "att_brand_loyalty",
+      "dunnhumby_fields": ["brand_type_spend_shares_json"],
+      "relation": "unvalidated_proxy",
+      "reason": "National/private brand-type spend shares do not identify loyalty to a specific brand or a stated attitude."
+    },
+    {
+      "persona_field": "lstyle_household_size",
+      "dunnhumby_fields": [],
+      "relation": "not_observed_in_main_input",
+      "reason": "The main X/S excludes household demographics because its observation time is unverified."
+    }
+  ]
+}
