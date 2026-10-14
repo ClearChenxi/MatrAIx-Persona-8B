@@ -17,6 +17,11 @@ Ollama response, official request, rendered messages and final official
 Survey result. Up to two technical retries and the frozen D rate fallback are
 recorded separately.
 
-The L0/L1/L2 direct-LLM controls, P2 wrong-household Persona, P3 reduced
-Persona and P4 second-model subset are not yet implemented in this branch.
-No T prediction, new timelock seal or final outcome evaluation has occurred.
+The direct L0/L1/L2 call primitive, same-activity P2 donor matching and P3
+RFM field reduction are implemented and covered by synthetic tests. L2 uses
+exactly the same model-visible messages as P1; the only difference is the
+Agent execution path. Therefore a deterministic equal-score result cannot be
+relabelled as an Agent workflow advantage. The full condition runner, P4
+frozen subset, historical calibration and final prediction contract remain
+to be implemented. No T prediction, new timelock seal or final outcome
+evaluation has occurred.

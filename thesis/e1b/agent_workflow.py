@@ -24,6 +24,7 @@ from thesis.e0a import run as e0a_run  # noqa: E402
 TEMPLATE = ROOT / "thesis/e1b/task"
 INSTRUMENT = "thesis_coupon_restart_v1"
 EXCLUSIONS = {"row_id", "household_key", "campaign", "split", "e2_role", "y1_redeemed"}
+P3_HOUSEHOLD_FIELDS = ("recency_days", "basket_count", "sales_total")
 
 
 def partition_fields(row: dict[str, str]) -> tuple[dict[str, str], dict[str, str]]:
@@ -91,11 +92,14 @@ def _digest(path: Path) -> str:
 def run_persona_batch(
     rows: tuple[dict[str, str], ...], destination: Path, *, model: str,
     options: dict, expected_digest: str, fallback_rate: float,
-    retries: int = 2,
+    retries: int = 2, method_id: str = "P1",
+    household_field_allowlist: tuple[str, ...] | None = None,
 ) -> list[dict]:
-    """Run P1 for one campaign; preserve every attempt and use D/R fallback."""
+    """Run one Agent condition for one campaign, preserving every attempt."""
     if not 0 <= fallback_rate <= 1 or retries not in (0, 1, 2):
         raise ValueError("invalid fallback or retry policy")
+    if method_id not in {"P1", "P2", "P3"}:
+        raise ValueError("only Persona Agent conditions use this runner")
     destination.mkdir(parents=True, exist_ok=False)
     e0a_run.bootstrap()
     task = build_task(rows, destination)
@@ -117,6 +121,11 @@ def run_persona_batch(
         with bind_task(task):
             for index, row in enumerate(rows, start=1):
                 behavior, _ = partition_fields(row)
+                if household_field_allowlist is not None:
+                    behavior = {key: value for key, value in behavior.items()
+                                if key in household_field_allowlist}
+                    if not behavior:
+                        raise ValueError("Persona reduction removed all household behavior")
                 attempts = []
                 score = None
                 message_hash = None
@@ -135,7 +144,8 @@ def run_persona_batch(
                         attempts.append({"number": attempt, "status": "failed", "error": str(error)})
                 fallback = score is None
                 output.append({
-                    "row_id": row["row_id"], "p_redeem": fallback_rate if fallback else score,
+                    "row_id": row["row_id"], "method_id": method_id,
+                    "p_redeem": fallback_rate if fallback else score,
                     "status": "fallback" if fallback else "passed", "fallback": fallback,
                     "attempts": attempts, "message_sha256": message_hash,
                     "model_digest": before["model_digest"],
@@ -149,8 +159,9 @@ def run_persona_batch(
         if after["model_digest"] != before["model_digest"]:
             raise RuntimeError("model changed during P1 run")
         e0a_run.save(destination / "run_manifest.json", {
-            "method": "P1", "instrument": INSTRUMENT, "model": model,
+            "method": method_id, "instrument": INSTRUMENT, "model": model,
             "model_digest": before["model_digest"], "options": options,
+            "household_field_allowlist": household_field_allowlist,
             "input_rows": len(rows), "output_rows": len(output),
             "actual_model_calls": server.budget.count,
             "retries_allowed": retries, "fallback_rate": fallback_rate,

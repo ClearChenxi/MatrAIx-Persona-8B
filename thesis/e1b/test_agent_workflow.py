@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from thesis.e1b.agent_workflow import bind_task, build_task, e0a_run, partition_fields
+from thesis.e1b.direct_controls import messages_for
 
 
 def synthetic_row(campaign_type="TypeC", duration="54"):
@@ -59,10 +60,19 @@ class AgentWorkflowTests(unittest.TestCase):
                     {"profiles": [{"id": "invented_profile", "behavior": household}]},
                     dest, task=task,
                 )
+                l2_dir = dest / "l2"
+                l2_dir.mkdir()
+                l2_messages = messages_for("L2", row, task, l2_dir)
+                l1_messages = messages_for("L1", row, task, dest)
+                l0_messages = messages_for("L0", row, task, dest)
             messages = prepared[0][2]
             self.assertIn("campaign_valid_days: 54", messages[1]["content"])
             self.assertIn("Top Commodity 1: FRUIT", messages[0]["content"])
             self.assertNotIn("invented_row", str(messages))
+            self.assertEqual(messages, l2_messages)
+            self.assertIn("basket_count: 0", l1_messages[0]["content"])
+            self.assertNotIn("basket_count", l0_messages[0]["content"])
+            self.assertIn("campaign_valid_days: 54", l0_messages[1]["content"])
 
     def test_activity_facts_must_match_within_batch(self):
         with tempfile.TemporaryDirectory() as temporary:
