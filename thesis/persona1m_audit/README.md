@@ -40,6 +40,7 @@ the updated `plan.json` are clean and pushed, run:
 
 This streams source type, packed attributes, missing bitmap, and overrides for
 the five predeclared candidate attributes. It reports only source-level counts
-and known category counts. It does not export any individual persona record,
+and known category counts, plus pairwise/three-field/four-field shared coverage
+for the four shopping-related attributes. It does not export any individual persona record,
 read household data or labels, or call a model. Attribute coverage is a
 feasibility measure, **not** evidence of household-persona matching quality.

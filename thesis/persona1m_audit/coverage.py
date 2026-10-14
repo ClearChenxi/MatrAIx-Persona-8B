@@ -14,6 +14,7 @@ import re
 import subprocess
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
+from itertools import combinations
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -91,6 +92,10 @@ def summarize(plan: dict, source: Path) -> dict:
     field_counters = defaultdict(Counter)
     value_counters = defaultdict(Counter)
     joint_counters = defaultdict(Counter)
+    combination_counters = defaultdict(Counter)
+    joint_fields = tuple(scope["shopping_joint_fields"])
+    combinations_to_count = [tuple(group) for size in range(2, len(joint_fields) + 1)
+                             for group in combinations(joint_fields, size)]
     source_rows = Counter()
     shard_rows = {}
     verified_bytes = 0
@@ -136,6 +141,9 @@ def summarize(plan: dict, source: Path) -> dict:
                                        else "not_all_shopping_present"] += 1
                 joint_counters[origin]["any_candidate_present" if present
                                        else "no_candidate_present"] += 1
+                for group in combinations_to_count:
+                    if all(field in present for field in group):
+                        combination_counters[origin][" & ".join(group)] += 1
 
     if verified_bytes != manifest["bytes"] or dict(source_rows) != expected_sources:
         raise ValueError("verified shard totals differ from the official manifest")
@@ -157,7 +165,11 @@ def summarize(plan: dict, source: Path) -> dict:
                 + joint_counters[origin]["not_all_shopping_present"] != source_rows[origin]):
             raise ValueError("joint attribute coverage does not account for every row")
         coverage[origin] = {"rows": source_rows[origin], "fields": fields,
-                            "joint": dict(sorted(joint_counters[origin].items()))}
+                            "joint": dict(sorted(joint_counters[origin].items())),
+                            "combination_coverage": {
+                                " & ".join(group): combination_counters[origin][" & ".join(group)]
+                                for group in combinations_to_count
+                            }}
     return {
         "status": "full_release_coverage_audited",
         "dataset_repo": plan["dataset_repo"], "dataset_revision": plan["dataset_revision"],
