@@ -1,0 +1,3 @@
+# Additional thesis-only packages beyond the fixed upstream uv.lock.
+scikit-learn==1.9.1
+catboost==1.2.10

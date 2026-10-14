@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "status": "method_development",
+  "input_run": "thesis/e1_data/runs/e1-data-20261014T040124.457555Z",
+  "input_commit": "5f48383f091c6f6d2ccfb0bab7a2dec9933cc62f",
+  "input_hashes": {
+    "features_D.csv": "eb52854a4a1babca25bf436bb1090337e7d402ea83576ee89bff593185843e91",
+    "features_R.csv": "985021d04d1b598586023c9801909256493600d6d3267cad2b32850e0cd820e0",
+    "features_T.csv": "4f510d84c5173181076ded962dd3b439a21e11139b6b75655c21fbe4e8a5c0da",
+    "links_D.csv": "731c1d459e0c9799d85b92a68feb697adc92f626c60f86f7627fd0144f3f9901",
+    "links_R.csv": "9555dbed3dfa0e3427e7065e3108b7a8c7498095d8a273bc3727239a106c7b7b",
+    "links_T.csv": "614a37b0d608059821b12ef4e5e9f57a11fe289c5b9e11d4df64ff90f6d06f0a",
+    "labels_D.csv": "f52593d2809abba7d965c98139267fb0f3f5d2b9b48df6e752702ac8289ee09a",
+    "labels_R.csv": "a75efb7c7fd123b258a0160cb67325ec2775906e9d3c6f6b7a42bec630045b99"
+  },
+  "seed": 20261014,
+  "historical_train_campaigns": [27, 28, 29],
+  "historical_holdout_campaigns": [1, 2, 3, 4, 5, 6, 7],
+  "logistic_c_grid": [0.01, 0.1, 1.0, 10.0],
+  "catboost_depth_grid": [3, 5],
+  "catboost_learning_rate_grid": [0.03, 0.1],
+  "catboost_max_iterations": 1000,
+  "catboost_early_stop_patience": 50
+}
