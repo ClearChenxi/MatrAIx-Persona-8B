@@ -70,6 +70,10 @@ def summarize(plan: dict, source: Path) -> dict:
         raise ValueError("candidate attribute field is repeated")
     if set(scope["shopping_joint_fields"]) - set(scope["candidate_fields"]):
         raise ValueError("joint coverage references an unregistered field")
+    if (len(scope["primary_two_field_candidate"]) != 2
+            or len(set(scope["primary_two_field_candidate"])) != 2
+            or set(scope["primary_two_field_candidate"]) - set(scope["shopping_joint_fields"])):
+        raise ValueError("primary two-field pair is not registered")
 
     hashes = plan["metadata_sha256"]
     codebook = json.loads(_checked(source, "persona_codes.schema.json",
@@ -93,6 +97,8 @@ def summarize(plan: dict, source: Path) -> dict:
     value_counters = defaultdict(Counter)
     joint_counters = defaultdict(Counter)
     combination_counters = defaultdict(Counter)
+    coded_pair_counts = defaultdict(Counter)
+    coded_pair_totals = Counter()
     joint_fields = tuple(scope["shopping_joint_fields"])
     combinations_to_count = [tuple(group) for size in range(2, len(joint_fields) + 1)
                              for group in combinations(joint_fields, size)]
@@ -129,6 +135,7 @@ def summarize(plan: dict, source: Path) -> dict:
                 overrides = {item["field_index"]: item["value"]
                              for item in (record["attribute_overrides"] or [])}
                 present = set()
+                coded_values = {}
                 for field in scope["candidate_fields"]:
                     index, allowed = columns[field]
                     kind, value = _value(attributes, bitmap, overrides, index, allowed)
@@ -137,6 +144,7 @@ def summarize(plan: dict, source: Path) -> dict:
                         present.add(field)
                     if value is not None:
                         value_counters[(origin, field)][value] += 1
+                        coded_values[field] = value
                 joint_counters[origin]["all_shopping_present" if set(scope["shopping_joint_fields"]) <= present
                                        else "not_all_shopping_present"] += 1
                 joint_counters[origin]["any_candidate_present" if present
@@ -144,6 +152,10 @@ def summarize(plan: dict, source: Path) -> dict:
                 for group in combinations_to_count:
                     if all(field in present for field in group):
                         combination_counters[origin][" & ".join(group)] += 1
+                primary = scope["primary_two_field_candidate"]
+                if all(field in coded_values for field in primary):
+                    coded_pair_totals[origin] += 1
+                    coded_pair_counts[origin][" | ".join(coded_values[field] for field in primary)] += 1
 
     if verified_bytes != manifest["bytes"] or dict(source_rows) != expected_sources:
         raise ValueError("verified shard totals differ from the official manifest")
@@ -166,6 +178,8 @@ def summarize(plan: dict, source: Path) -> dict:
             raise ValueError("joint attribute coverage does not account for every row")
         coverage[origin] = {"rows": source_rows[origin], "fields": fields,
                             "joint": dict(sorted(joint_counters[origin].items())),
+                            "primary_pair_both_coded": coded_pair_totals[origin],
+                            "primary_pair_category_counts": dict(sorted(coded_pair_counts[origin].items())),
                             "combination_coverage": {
                                 " & ".join(group): combination_counters[origin][" & ".join(group)]
                                 for group in combinations_to_count
@@ -179,6 +193,7 @@ def summarize(plan: dict, source: Path) -> dict:
         "verified_rows": sum(source_rows.values()),
         "candidate_fields": scope["candidate_fields"],
         "joint_fields": scope["shopping_joint_fields"],
+        "primary_two_field_candidate": scope["primary_two_field_candidate"],
         "coverage_by_source": coverage,
         "matching_quality_measured": False,
         "household_data_opened": False, "T_labels_opened": False,

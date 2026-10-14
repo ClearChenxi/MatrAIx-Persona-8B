@@ -44,3 +44,7 @@ and known category counts, plus pairwise/three-field/four-field shared coverage
 for the four shopping-related attributes. It does not export any individual persona record,
 read household data or labels, or call a model. Attribute coverage is a
 feasibility measure, **not** evidence of household-persona matching quality.
+For the agreed shopping-style/frugality pair it also counts records where both
+values decode to known codebook categories, and reports only aggregate joint
+category counts. Exact per-row overrides are not emitted or treated as known
+categories for candidate weighting.

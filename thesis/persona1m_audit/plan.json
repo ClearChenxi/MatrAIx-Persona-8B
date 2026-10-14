@@ -28,6 +28,7 @@
       "pref_save_vs_spend",
       "att_brand_loyalty"
     ],
+    "primary_two_field_candidate": ["lstyle_shopping_style", "lstyle_frugality"],
     "reporting": "aggregate_counts_only_no_persona_rows_or_identifiers"
   },
   "dunnhumby_splits": ["D", "R"],

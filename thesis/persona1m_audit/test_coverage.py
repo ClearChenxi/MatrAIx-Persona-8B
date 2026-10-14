@@ -54,6 +54,7 @@ def fixture(root: Path) -> dict:
             "status": "approved_full_release_coverage_only",
             "expected_shards": 1, "expected_bytes": shard.stat().st_size,
             "candidate_fields": FIELDS, "shopping_joint_fields": FIELDS[:4],
+            "primary_two_field_candidate": FIELDS[:2],
             "reporting": "aggregate_counts_only_no_persona_rows_or_identifiers",
         },
     }
@@ -71,9 +72,12 @@ class CoverageTests(unittest.TestCase):
             self.assertEqual(wiki["fields"]["shopping"]["known_category_counts"], {"A": 1})
             self.assertEqual(wiki["joint"]["all_shopping_present"], 2)
             self.assertEqual(wiki["combination_coverage"]["shopping & frugality"], 2)
+            self.assertEqual(wiki["primary_pair_both_coded"], 1)
+            self.assertEqual(wiki["primary_pair_category_counts"], {"A | A": 1})
             self.assertEqual(synthetic["fields"]["frugality"]["missing"], 1)
             self.assertEqual(synthetic["joint"]["not_all_shopping_present"], 1)
             self.assertEqual(synthetic["combination_coverage"]["shopping & frugality"], 0)
+            self.assertEqual(synthetic["primary_pair_both_coded"], 0)
             self.assertFalse(result["person_rows_written"])
             self.assertFalse(result["household_data_opened"])
             self.assertNotIn("unlisted shopper style", json.dumps(result))
