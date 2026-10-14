@@ -15,7 +15,9 @@ observed household field has its own line. The `PersonaJsonSurvey` agent and
 checks all original D20/R100 inputs without model calls: P1 and L2 messages
 remain identical, and comparison with the original messages permits only
 newline changes. This is a local template patch, not an unmodified upstream
-configuration; the full D20/R100 gate must be rerun before any T prediction.
+configuration. The complete D20/R100 retest was performed and independently
+verified; R100 again failed the P1 diversity gate. No formal T prediction is
+permitted under the current configuration. See `P1_TEMPLATE_RETEST_20261014.md`.
 
 `pilot.py` deterministically selects 20 D boundary records and 100 R records
 stratified over four historical validation campaigns and the pre-frozen
