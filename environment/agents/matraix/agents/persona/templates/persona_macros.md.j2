@@ -98,8 +98,8 @@
 {% if b %}
 ## Behavior
 {% for key, value in b.items() %}
-- {{ key | replace('_', ' ') | title }}: {% if value is iterable and value is not string %}{{ value | join(', ') }}{% else %}{{ value }}{% endif %}
-{% endfor -%}
+- {{ key | replace('_', ' ') | title }}: {% if value is iterable and value is not string %}{{ value | join(', ') }}{% else %}{{ value }}{% endif %}{{ '\n' }}
+{%- endfor -%}
 {% endif -%}
 {% endmacro %}
 

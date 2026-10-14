@@ -68,6 +68,10 @@ class AgentWorkflowTests(unittest.TestCase):
             messages = prepared[0][2]
             self.assertIn("campaign_valid_days: 54", messages[1]["content"])
             self.assertIn("Top Commodity 1: FRUIT", messages[0]["content"])
+            behavior_lines = [line for line in messages[0]["content"].splitlines() if line.startswith("- ")]
+            self.assertEqual(behavior_lines, [
+                f"- {key.replace('_', ' ').title()}: {value}" for key, value in household.items()
+            ])
             self.assertNotIn("invented_row", str(messages))
             self.assertEqual(messages, l2_messages)
             self.assertIn("basket_count: 0", l1_messages[0]["content"])

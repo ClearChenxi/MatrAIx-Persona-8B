@@ -8,6 +8,15 @@ rejects execution without a generated fact card. Household behavior comes
 from all 56 frozen X/S feature fields after removing `row_id` and separating
 activity S from household X. Identifiers and labels are never rendered.
 
+After the first R100 technical gate failed, this fork changed only the
+`render_behavior` Jinja whitespace in the bundled Persona template so each
+observed household field has its own line. The `PersonaJsonSurvey` agent and
+`HostEnvironment` execution path remain unchanged. `verify_rendering.py`
+checks all original D20/R100 inputs without model calls: P1 and L2 messages
+remain identical, and comparison with the original messages permits only
+newline changes. This is a local template patch, not an unmodified upstream
+configuration; the full D20/R100 gate must be rerun before any T prediction.
+
 `pilot.py` deterministically selects 20 D boundary records and 100 R records
 stratified over four historical validation campaigns and the pre-frozen
 behavior groups. Without `--execute`, it only displays the selection hash and
