@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "status": "confirmed_subset_scope",
+  "scope_confirmed_on": "2026-10-14",
+  "input_split": "T",
+  "input_role": "final_evaluation",
+  "expected_campaigns": [14, 15, 16, 17, 19, 20, 21, 22, 23, 25],
+  "per_campaign_cap": 20,
+  "selection_seed": 20261014,
+  "expected_selected_row_ids_sha256": "1753104cfba7370044b4b5ea8b5a2d4134833a17694b91a003cac0263577d31c",
+  "selection_policy": "D-fitted X/S behavior-group round robin; within each group SHA-256 of seed, frozen X/S facts and blinded row key; no T outcomes",
+  "paired_methods": ["L1", "L2", "P1", "P2", "P3"],
+  "model_pair": ["qwen3.5:9b", "gemma4:e4b"],
+  "exact_second_model_digest": "pending_D_R_technical_pilot",
+  "formal_prediction_status": "not_authorized_pending_protocol_freeze"
+}

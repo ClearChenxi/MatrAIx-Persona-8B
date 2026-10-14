@@ -1,6 +1,8 @@
 {
   "schema_version": "1.0",
-  "status": "pending_pilot_scope_confirmation",
+  "status": "confirmed",
+  "scope_confirmed_on": "2026-10-14",
+  "scope_confirmation": "User approved the manual-default D20 boundary sample and R100 stratified sample; one generation per row at temperature 0 and fixed seed.",
   "model": "qwen3.5:9b",
   "model_digest": "6488c96fa5faab64bb65cbd30d4289e20e6130ef535a93ef9a49f42eda893ea7",
   "think": false,

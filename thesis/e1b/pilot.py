@@ -142,12 +142,15 @@ def run(split_name: str, pilot_config: dict, input_config: dict) -> dict:
     ) and len(score_counts) > 1 and largest_share < 0.9
     legal_rate = len(valid) / len(outputs)
     report = {
-        "status": "pilot_passed" if legal_rate >= 0.99 and adequate_diversity else "technical_gate_failed",
+        "status": "pilot_passed" if legal_rate >= 0.99 and (
+            split_name == "D" or adequate_diversity
+        ) else "technical_gate_failed",
         "split": split_name, "code_commit": commit, "input_run": input_config["input_run"],
         "model": pilot_config["model"], "model_digest": pilot_config["model_digest"],
         "selection": selection, "requested_rows": len(rows), "output_rows": len(outputs),
         "legal_rate": legal_rate, "distinct_legal_scores": len(score_counts),
         "largest_single_score_share": largest_share,
+        "R_diversity_gate_applicable": split_name == "R",
         "distinct_scores_by_campaign": {str(k): len(v) for k, v in sorted(by_camp_scores.items())},
         "elapsed_seconds": time.monotonic() - started,
         "test_labels_opened": False,

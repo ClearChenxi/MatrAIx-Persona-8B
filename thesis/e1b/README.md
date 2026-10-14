@@ -11,8 +11,8 @@ activity S from household X. Identifiers and labels are never rendered.
 `pilot.py` deterministically selects 20 D boundary records and 100 R records
 stratified over four historical validation campaigns and the pre-frozen
 behavior groups. Without `--execute`, it only displays the selection hash and
-per-campaign counts. Its execution gate currently remains pending until the
-pilot scope is confirmed and pushed. Each actual call retains the native
+per-campaign counts. Its scope is now user-confirmed; execution still requires
+the exact code and configuration commit to be pushed. Each actual call retains the native
 Ollama response, official request, rendered messages and final official
 Survey result. Up to two technical retries and the frozen D rate fallback are
 recorded separately.
@@ -24,6 +24,10 @@ Agent execution path. Therefore a deterministic equal-score result cannot be
 relabelled as an Agent workflow advantage. `condition_pilot.py` prepares D/R
 comparisons for all six conditions; execution is locked pending P1's D/R
 technical gate. `subsample.py` defines the label-free paired P4 selector;
-its per-activity cap is not yet frozen. Historical calibration, the formal
+the user-confirmed cap is 20 final-evaluation records per T activity, selected
+before model execution using X/S-derived groups and deterministic hashes.
+`p4_plan.py` records the exact paired 194-row final-evaluation subset, its
+per-activity counts and hash without reading T outcomes or calling a model.
+Historical calibration, the formal
 T runner and prediction contract remain to be implemented. No T prediction,
 new timelock seal or final outcome evaluation has occurred.

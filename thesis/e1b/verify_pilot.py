@@ -58,6 +58,14 @@ def verify(run: Path) -> dict:
             or report["distinct_legal_scores"] != len(counts)
             or report["distinct_scores_by_campaign"] != {str(k): len(v) for k, v in sorted(by_campaign.items())}):
         raise ValueError("pilot diversity summary differs from predictions")
+    adequate_diversity = len(counts) > 1 and largest < 0.9 and all(
+        len(by_campaign[int(campaign)]) >= 3
+        for campaign, count in selection["campaign_counts"].items() if count >= 20
+    )
+    passed = legal_rate >= 0.99 and (report["split"] == "D" or adequate_diversity)
+    if (report["R_diversity_gate_applicable"] != (report["split"] == "R")
+            or report["status"] != ("pilot_passed" if passed else "technical_gate_failed")):
+        raise ValueError("pilot technical gate status differs from raw predictions")
     actual_calls = 0
     for campaign, count in selection["campaign_counts"].items():
         folder = run / f"campaign_{campaign}"
