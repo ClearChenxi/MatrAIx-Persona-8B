@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "status": "pending_exact_formula_confirmation",
+  "source_coverage_report": "thesis/persona1m_audit/runs/coverage-20261014T124609.164458Z/report.json",
+  "source_coverage_report_sha256": "21bafedfaadc8cd8b3f82e33bbd916954a9270fce1e9c5ae9a7f84db0be2a226",
+  "expected_human_coded_rows": 3378,
+  "expected_synthetic_coded_rows": 400000,
+  "fields": ["lstyle_shopping_style", "lstyle_frugality"],
+  "D_proxy_fields": ["coupon_discount_basket_share", "retail_discount_basket_share"],
+  "D_rank_policy": "midrank_less_plus_half_equal_over_729",
+  "weight_policy": "bargain=(1+q_coupon)/1.5;frugal=(1+q_retail)/1.5;product_if_both",
+  "source_mixture": "normalize_within_each_source_then_mix_by_eligible_source_count_over_3378",
+  "human_sources": ["amazon", "prism", "real_human_survey", "stackoverflow", "wiki"],
+  "synthetic_source": "synthetic",
+  "output_decimal_places": 6,
+  "splits": ["D", "R"],
+  "individual_persona_rows_permitted": false,
+  "response_labels_permitted": false,
+  "T_permitted": false,
+  "model_calls_permitted": false
+}

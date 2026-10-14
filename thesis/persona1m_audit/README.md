@@ -54,3 +54,10 @@ only the hash-verified `features_D.csv` for the two proposed discount shares
 and reports variation and D quantiles. It does not load D labels, R or T,
 Persona 1M rows, or a model; its purpose is to decide whether a weak proxy
 weighting proposal is even technically distinguishable across households.
+
+`aggregate.py` is a separate, currently **disabled** D/R-only preparation
+step. It consumes only the pinned source-by-category counts from the complete
+release audit plus hash-verified D/R X, not any individual Persona 1M record.
+The exact midrank/weak-weight formula is documented in the E1b extension draft
+and covered by invented-data tests. Its config stays pending until the user
+confirms the exact formula; it cannot execute or call a model in that state.
