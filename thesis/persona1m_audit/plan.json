@@ -6,10 +6,30 @@
   "metadata_sha256": {
     "README.md": "979506a40a74d29bbd08d88047fa9952246b52548c571c022fbf3b3b63ba21f6",
     "persona_codes.schema.json": "a02221ff32c2bc135c5e4290e1383081188712ee88f5c341f5fdb56d3d7b1c5c",
-    "audit.json": "74264580a873240896c1954fa053af6cbd6da38be8599dcd504ef13ac965dd82"
+    "audit.json": "74264580a873240896c1954fa053af6cbd6da38be8599dcd504ef13ac965dd82",
+    "manifest.json": "b8582f8fcc6f7023bc46a7d675854c8ce8e44ad886095de9d66005866fdb63a3"
   },
   "expected_persona_rows": 999847,
   "expected_persona_fields": 1290,
+  "coverage_audit": {
+    "status": "approved_full_release_coverage_only",
+    "expected_shards": 10,
+    "expected_bytes": 4167729762,
+    "candidate_fields": [
+      "lstyle_shopping_style",
+      "lstyle_frugality",
+      "pref_save_vs_spend",
+      "att_brand_loyalty",
+      "lstyle_household_size"
+    ],
+    "shopping_joint_fields": [
+      "lstyle_shopping_style",
+      "lstyle_frugality",
+      "pref_save_vs_spend",
+      "att_brand_loyalty"
+    ],
+    "reporting": "aggregate_counts_only_no_persona_rows_or_identifiers"
+  },
   "dunnhumby_splits": ["D", "R"],
   "bridges": [
     {

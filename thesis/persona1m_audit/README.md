@@ -27,3 +27,19 @@ The dataset card marks the release as non-commercial research-only and notes
 that it is not a representative population sample. A separate design and
 license review is required before using any persona records in a household-
 level prediction condition.
+
+The next, independently authorized phase audits the *complete* pinned release
+without joining any Dunnhumby table. Download the ten Parquet shards listed
+in the pinned official `manifest.json` into ignored `source/data/`; check
+that each shard's size, SHA-256 and row count match. Only after this code and
+the updated `plan.json` are clean and pushed, run:
+
+```bash
+.venv/bin/python -m thesis.persona1m_audit.coverage
+```
+
+This streams source type, packed attributes, missing bitmap, and overrides for
+the five predeclared candidate attributes. It reports only source-level counts
+and known category counts. It does not export any individual persona record,
+read household data or labels, or call a model. Attribute coverage is a
+feasibility measure, **not** evidence of household-persona matching quality.
