@@ -25,7 +25,8 @@
   "limitations": [
     "cannot prove that plaintext was not copied before the recorded seal",
     "cannot replace an independent witness for historical researcher conduct",
-    "a stage is invalid if its required prediction freeze was not pushed before the scheduled unlock"
+    "a stage is invalid if its required prediction freeze was not pushed before the scheduled unlock",
+    "researcher explicitly chose a window shorter than the 7-day conservative default. Disclosure text committed in v2 freeze-manifest.md"
   ],
   "logical_label_objects": {
     "T_adaptation_labels": {
@@ -41,7 +42,7 @@
       "unlock_stage": "final_evaluation"
     }
   },
-  "minimum_window_rationale": "drand Quicknet period = 3 s/round. No protocol-level minimum exists. Initial policy set both windows to 604800 s (7 d) for conservative audit margin; revised to 1800 s (30 min) on 2026-10-12 because the two-stage mechanism (prediction freeze + replica + plaintext removal + GitHub workflow attestation) is sufficient to defeat opportunistic early reveal at 600-round depth (30 min = 600 rounds) and the thesis timeline required a shorter window.",
+  "minimum_window_rationale": "drand Quicknet period = 3 s/round. No protocol-level minimum exists. Initial v1 policy set both windows to 604800 s (7 d) for conservative audit margin, then revised to 1800 s (30 min) on 2026-10-12. The 30-min window violated the 7-day conservative baseline (DEPRECATED.md §5/§8.5) and is being replaced. The v2 window from 2026-10-14 is 3600 s (1 h) per stage, total 2 h. Rationale: (a) Quicknet 1200-round depth under BLS threshold signature at standard t-of-n assumptions is sufficient to defeat opportunistic early reveal at this window; (b) the full v2 mechanism (E1a+E1b+E2 prediction freeze + 2 distinct-device replicas + plaintext chmod-000+rename-sealed-off + GitHub workflow attestation + pre-removal inventory) is in place; (c) the researcher accepted the trade-off of shorter window for thesis timeline. The disclosure text is committed in v2 freeze-manifest.md §6.",
   "plaintext_paths_that_must_not_exist_after_seal": [
     "private/labels_T_SEALED.csv",
     "private/label_summary_PRIVATE.json",
@@ -110,38 +111,25 @@
     }
   },
   "schema_version": "3.0",
-  "status": "timelock_schedule_registered",
+  "status": "timelock_schedule_pending",
   "timelock": {
     "beacon_id": "quicknet",
     "chain_hash": "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971",
     "genesis_time": 1692803367,
     "implementation": "github.com/drand/tlock/cmd/tle",
-    "minimum_preparation_lead_seconds": 1800,
-    "minimum_stage_separation_seconds": 1800,
+    "minimum_preparation_lead_seconds": 3600,
+    "minimum_stage_separation_seconds": 3600,
     "module_sum": "h1:YmbH2PXsq6UeUXljq+GMZcDicUlVnLIW9QbLqYoDp6g=",
     "module_version": "v1.2.0",
     "network_url": "https://api.drand.sh/",
     "period_seconds": 3,
     "public_key": "83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a",
-    "schedule_registration": {
-      "observed_latest_randomness": "683eabc6f0358358148a52f4834e8f03dc8e472acbec0dda024829ad88f5ed52",
-      "observed_latest_round": 33017661,
-      "observed_latest_signature": "81eada8fcdae060b2b6fe87986c08af6c5e168bb8b8bd0cca46c91d9ef06b040ce6cb4484bc036a72edb3be34183d587",
-      "registered_at_utc": "2026-10-13T01:52:33.496083Z"
-    },
+    "schedule_registration": null,
     "scheme_id": "bls-unchained-g1-rfc9380",
     "stages": {
-      "adaptation": {
-        "requested_unlock_at_utc": "2026-10-13T02:30:00Z",
-        "round": 33018412,
-        "unlock_at_utc": "2026-10-13T02:30:00Z"
-      },
-      "final_evaluation": {
-        "requested_unlock_at_utc": "2026-10-13T03:00:00Z",
-        "round": 33019012,
-        "unlock_at_utc": "2026-10-13T03:00:00Z"
-      }
+      "adaptation": null,
+      "final_evaluation": null
     },
-    "status": "registered"
+    "status": "pre_registration"
   }
 }

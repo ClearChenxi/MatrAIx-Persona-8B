@@ -241,11 +241,18 @@ def run_b1(splits=("D", "R", "T")) -> dict:
 # ---------- Main ----------
 
 def main():
+    """Compute N0/N1/B1 metrics on D/R only.
+
+    Per 手册 §21: baselines do NOT run on T (T labels sealed). T prediction
+    is the responsibility of e1a_v2/methods/run_T_predictions.py after
+    the protocol freeze. We pass splits=("D","R") explicitly so this script
+    never accidentally attempts to read sealed T labels via load_split("T").
+    """
     D_feats, D_labels, _ = load_split("D")
     result = {
-        "N0": run_n0(D_labels),
-        "N1": run_n1(D_feats, D_labels),
-        "B1": run_b1(),
+        "N0": run_n0(D_labels, splits=("D", "R")),
+        "N1": run_n1(D_feats, D_labels, splits=("D", "R")),
+        "B1": run_b1(splits=("D", "R")),
     }
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     return result

@@ -202,7 +202,12 @@ def run_catboost(splits=("D", "R", "T")) -> dict:
 
 
 def main():
-    print(json.dumps(run_catboost(), ensure_ascii=False, indent=2, default=str))
+    """Run B3 (CatBoost) on D/R only.
+
+    Per 手册 §21: baselines do NOT run on T (T labels sealed). T prediction
+    is the responsibility of e1a_v2/methods/run_T_predictions.py.
+    """
+    print(json.dumps(run_catboost(splits=("D", "R")), ensure_ascii=False, indent=2, default=str))
 
 
 if __name__ == "__main__":

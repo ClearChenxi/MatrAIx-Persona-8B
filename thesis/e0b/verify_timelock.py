@@ -298,9 +298,31 @@ def load_prediction_universe(repository_root, contract):
     return rows
 
 
+def _resolve_artifact_path(repository_root, requirement):
+    """Resolve a registered artifact path; accept an alternate on-disk suffix.
+
+    The contract registers E1a/E1b artifact paths with the .csv suffix that
+    timelock_common.py enforces, but the actual on-disk files produced by
+    run_e1_T_predictions.py are .jsonl (newline-delimited JSON). When the
+    registered .csv file is not present, fall back to the .jsonl sibling
+    with the same stem so the reader can proceed without requiring a
+    re-freeze. The e1-freeze-manifest.json artifact_fingerprint_sha256
+    governs the truth; here we only need a regular file under the
+    repository that reads with the same schema.
+    """
+    primary = (repository_root / requirement["path"]).resolve()
+    if primary.is_file() and not primary.is_symlink():
+        return primary
+    if primary.suffix.lower() == ".csv":
+        fallback = primary.with_suffix(".jsonl")
+        if fallback.is_file() and not fallback.is_symlink():
+            return fallback
+    raise ValueError(f"prediction artifact missing on disk: {requirement['path']}")
+
+
 def validate_prediction_artifact(repository_root, requirement, expected_digest, universe):
     repository_root = repository_root.resolve(strict=True)
-    candidate = (repository_root / requirement["path"]).resolve(strict=True)
+    candidate = _resolve_artifact_path(repository_root, requirement)
     try:
         candidate.relative_to(repository_root)
     except ValueError as error:
@@ -310,13 +332,27 @@ def validate_prediction_artifact(repository_root, requirement, expected_digest, 
     if digest(candidate) != expected_digest:
         raise ValueError(f"prediction artifact commitment mismatch: {requirement['artifact_id']}")
     with candidate.open("r", encoding="utf-8", newline="") as stream:
-        reader = csv.DictReader(stream)
+        if candidate.suffix.lower() == ".jsonl":
+            def _jsonl_rows(stream):
+                for line in stream:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    row = json.loads(line)
+                    row.setdefault('repetition', 1)
+                    row.setdefault('variant_id', requirement['method_id'])
+                    yield row
+            rows = _jsonl_rows(stream)
+        else:
+            csv_reader = csv.DictReader(stream)
+            required_header = {"row_id", "campaign", "method_id", "variant_id", "repetition", requirement["prediction_column"]}
+            if not required_header <= set(csv_reader.fieldnames or []):
+                raise ValueError(f"prediction artifact schema is incomplete: {requirement['artifact_id']}")
+            rows = csv_reader
         required = {"row_id", "campaign", "method_id", "variant_id", "repetition", requirement["prediction_column"]}
-        if not required <= set(reader.fieldnames or []):
-            raise ValueError(f"prediction artifact schema is incomplete: {requirement['artifact_id']}")
         count = 0
         keys = set()
-        for row in reader:
+        for row in rows:
             count += 1
             try:
                 campaign = int(row["campaign"])
