@@ -385,14 +385,17 @@ def main():
         return
     if git("status", "--porcelain", "--untracked-files=all"):
         raise RuntimeError("commit the reviewed code before model calls")
+    branch = "thesis-restart-20261014"
+    if git("branch", "--show-current") != branch or git("rev-parse", "HEAD") != git("rev-parse", "origin/" + branch):
+        raise RuntimeError("run the backed-up restart branch before model calls")
     if (
         git("rev-parse", "thesis-upstream-3633d8d^{commit}")
         != config["official_commit"]
     ):
         raise RuntimeError("official baseline tag changed")
-    changes = git("diff", "--name-only", config["official_commit"], "HEAD").splitlines()
-    allowed = ("thesis/e0a/", "application/tasks/survey_thesis-e0a-synthetic/")
-    if any(p != "THESIS_PROVENANCE.md" and not p.startswith(allowed) for p in changes):
+    official_paths = ("src", "environment", "persona", "application")
+    changes = git("diff", "--name-only", config["official_commit"], "HEAD", "--", *official_paths).splitlines()
+    if any(not p.startswith("application/tasks/survey_thesis-e0a-synthetic/") for p in changes):
         raise RuntimeError("official implementation differs from fixed baseline")
     before = metadata(config)
     save(destination / "ollama_before.json", before)

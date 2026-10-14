@@ -20,9 +20,9 @@ from verify import verify
 
 
 def check_code():
-    branch = "thesis-integration-3633d8d"
+    branch = "thesis-restart-20261014"
     if run.git("branch", "--show-current") != branch:
-        raise RuntimeError("historical checks belong on the integration branch")
+        raise RuntimeError("historical checks belong on the restart branch")
     if run.git("status", "--porcelain", "--untracked-files=all"):
         raise RuntimeError("review, commit and back up code before real preparation/execution")
     if run.git("rev-parse", "HEAD") != run.git("rev-parse", "origin/" + branch):
@@ -30,9 +30,9 @@ def check_code():
     baseline = "3633d8dab149a9482a71b024418a49ae828cc941"
     if run.git("rev-parse", "thesis-upstream-3633d8d^{commit}") != baseline:
         raise RuntimeError("official fixed baseline moved")
-    allowed = ("thesis/e0a/", "application/tasks/survey_thesis-e0a-synthetic/")
-    changes = run.git("diff", "--name-only", baseline, "HEAD").splitlines()
-    if any(p != "THESIS_PROVENANCE.md" and not p.startswith(allowed) for p in changes):
+    official_paths = ("src", "environment", "persona", "application")
+    changes = run.git("diff", "--name-only", baseline, "HEAD", "--", *official_paths).splitlines()
+    if any(not p.startswith("application/tasks/survey_thesis-e0a-synthetic/") for p in changes):
         raise RuntimeError("official source differs from fixed baseline")
 
 

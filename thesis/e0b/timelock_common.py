@@ -18,7 +18,7 @@ from audit import digest
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
-EXPECTED_BRANCH = "thesis-integration-3633d8d"
+EXPECTED_BRANCH = "thesis-restart-20261014"
 MAX_BEACON_AGE_PERIODS = 5
 
 
