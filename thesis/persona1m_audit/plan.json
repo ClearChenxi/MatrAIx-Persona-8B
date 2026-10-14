@@ -32,6 +32,12 @@
     "reporting": "aggregate_counts_only_no_persona_rows_or_identifiers"
   },
   "dunnhumby_splits": ["D", "R"],
+  "proxy_diagnostic": {
+    "status": "approved_D_features_only",
+    "fields": ["coupon_discount_basket_share", "retail_discount_basket_share"],
+    "quantiles": ["1/3", "1/2", "2/3", "9/10"],
+    "labels_permitted": false
+  },
   "bridges": [
     {
       "persona_field": "lstyle_shopping_style",

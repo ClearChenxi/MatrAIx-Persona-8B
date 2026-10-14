@@ -48,3 +48,9 @@ For the agreed shopping-style/frugality pair it also counts records where both
 values decode to known codebook categories, and reports only aggregate joint
 category counts. Exact per-row overrides are not emitted or treated as known
 categories for candidate weighting.
+
+`proxy_diagnostic.py` is a separate D-only pre-label input check. It reads
+only the hash-verified `features_D.csv` for the two proposed discount shares
+and reports variation and D quantiles. It does not load D labels, R or T,
+Persona 1M rows, or a model; its purpose is to decide whether a weak proxy
+weighting proposal is even technically distinguishable across households.
