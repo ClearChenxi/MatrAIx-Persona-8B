@@ -37,7 +37,7 @@ class AvailabilityTests(unittest.TestCase):
         return pa.RecordBatch.from_pylist(rows, schema=schema)
 
     def result(self):
-        specs = [("even", 0, 2), ("odd", 1, 2), ("next_byte", 8, 2)]
+        specs = [("even", 0, ("A", "B")), ("odd", 1, ("A", "B")), ("next_byte", 8, ("A", "B"))]
         totals = audit.initialize(specs)
         audit.accumulate(self.batch(), specs, totals)
         return audit.finalize(totals)
@@ -67,7 +67,7 @@ class AvailabilityTests(unittest.TestCase):
         self.assertNotIn("999", text)
 
     def test_source_combination_preserves_denominators(self):
-        specs = [("even", 0, 2), ("odd", 1, 2), ("next_byte", 8, 2)]
+        specs = [("even", 0, ("A", "B")), ("odd", 1, ("A", "B")), ("next_byte", 8, ("A", "B"))]
         totals = audit.initialize(specs)
         audit.accumulate(self.batch(), specs, totals)
         merged = audit.combine_sources(totals, audit.SOURCES, specs)
@@ -75,6 +75,20 @@ class AvailabilityTests(unittest.TestCase):
         self.assertEqual(result["even"]["rows"], 3)
         self.assertEqual(result["even"]["nonmissing"], 2)
         self.assertEqual(result["even"]["grounding_rows"], 2)
+
+    def test_unknown_override_not_counted_as_informative(self):
+        batch = self.batch()
+        rows = batch.to_pylist()
+        rows[2]["attribute_overrides"][-1]["value"] = "Unknown"
+        specs = [("even", 0, ("A", "B")), ("odd", 1, ("A", "B")), ("next_byte", 8, ("A", "B"))]
+        totals = audit.initialize(specs)
+        audit.accumulate(pa.RecordBatch.from_pylist(rows, schema=batch.schema), specs, totals)
+        result = audit.finalize(totals)["synthetic"]["even"]
+        self.assertEqual(result["nonmissing"], 2)
+        self.assertEqual(result["explicit_unavailable_marker_rows"], 1)
+        self.assertEqual(result["informative_nonempty_rows"], 1)
+        self.assertEqual(result["current_codebook_compatible_rows"], 1)
+        self.assertFalse(audit.unavailable("None"))
 
 
 if __name__ == "__main__":

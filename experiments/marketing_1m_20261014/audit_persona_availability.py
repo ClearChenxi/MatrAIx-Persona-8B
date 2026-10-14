@@ -30,12 +30,25 @@ FIELDS = (
 SOURCES = ("wiki", "amazon", "stackoverflow", "prism", "gss", "real_human_survey", "synthetic")
 READ_COLUMNS = ["source", "attributes", "null_bitmap", "attribute_overrides", "grounding"]
 ASSIGNMENT_TYPES = {"direct", "structured_claim", "summary_inference", "unsupported"}
+UNAVAILABLE_MARKERS = frozenset({"unknown", "unspecified", "not specified", "not available",
+                                 "n/a", "na", "null", "not reported", "not provided",
+                                 "prefer not to say", "unsure", "unclear", "no information",
+                                 "unknown/not specified", "unknown / not specified"})
 COUNTS = ("rows", "nonmissing", "nonempty", "invalid_base_code", "override_rows",
           "blank_override_rows", "duplicate_override_entries", "grounding_rows",
           "grounding_records", "evidence_rows", "nonempty_with_evidence_rows",
           "evidence_without_nonempty_value_rows", "confidence_present_rows",
           "confidence_finite_records", "confidence_in_unit_interval_records",
-          "confidence_outside_unit_interval_records", "direct_with_evidence_rows")
+          "confidence_outside_unit_interval_records", "direct_with_evidence_rows",
+          "current_codebook_compatible_rows", "legacy_not_in_codebook_rows",
+          "explicit_unavailable_marker_rows", "informative_nonempty_rows",
+          "informative_with_evidence_rows", "informative_current_codebook_rows")
+
+
+def unavailable(value):
+    normalized = " ".join(str(value).strip().casefold().replace("_", " ").split())
+    # 'None' is deliberately not a missing marker: e.g. no investments can be valid.
+    return normalized in UNAVAILABLE_MARKERS
 
 
 def initialize(specs):
@@ -72,10 +85,14 @@ def accumulate(batch, specs, totals):
                                     for value in bitmaps), dtype=np.uint8).reshape(n, 162)
     codes = np.column_stack([(packed[:, index // 2] >> (4 * (index % 2))) & 15 for index in indices])
     declared = np.column_stack([((missing[:, index // 8] >> (index % 8)) & 1) == 0 for index in indices])
-    valid = codes < np.array([item[2] for item in specs])
+    valid = codes < np.array([len(item[2]) for item in specs])
     invalid = declared & ~valid
     present = declared & valid
     nonempty = present.copy()
+    compatible = present.copy()
+    explicitly_unavailable = np.column_stack([
+        np.isin(codes[:, col], [index for index, value in enumerate(item[2]) if unavailable(value)])
+        for col, item in enumerate(specs)]) & present
     overrides = np.zeros_like(present)
     blank_overrides = np.zeros_like(present)
     duplicate_overrides = np.zeros_like(codes, dtype=np.int64)
@@ -93,6 +110,8 @@ def accumulate(batch, specs, totals):
             nonempty[parent, col] = bool(str(value).strip())
             overrides[parent, col] = True
             blank_overrides[parent, col] = not bool(str(value).strip())
+            compatible[parent, col] = str(value) in specs[col][2]
+            explicitly_unavailable[parent, col] = unavailable(value)
     grounded = np.zeros_like(present)
     evidence = np.zeros_like(present)
     confidence_present = np.zeros_like(present)
@@ -125,6 +144,7 @@ def accumulate(batch, specs, totals):
                 stats["confidence_max"] = confidence if stats["confidence_max"] is None else max(stats["confidence_max"], confidence)
                 stats["confidence_in_unit_interval_records" if 0 <= confidence <= 1 else
                       "confidence_outside_unit_interval_records"] += 1
+    informative = nonempty & ~explicitly_unavailable
     row_metrics = {
         "nonmissing": present, "nonempty": nonempty, "invalid_base_code": invalid,
         "override_rows": overrides, "blank_override_rows": blank_overrides,
@@ -132,6 +152,12 @@ def accumulate(batch, specs, totals):
         "evidence_rows": evidence, "nonempty_with_evidence_rows": nonempty & evidence,
         "evidence_without_nonempty_value_rows": evidence & ~nonempty,
         "confidence_present_rows": confidence_present, "direct_with_evidence_rows": direct_evidence,
+        "current_codebook_compatible_rows": compatible,
+        "legacy_not_in_codebook_rows": present & ~compatible,
+        "explicit_unavailable_marker_rows": explicitly_unavailable & present,
+        "informative_nonempty_rows": informative,
+        "informative_with_evidence_rows": informative & evidence,
+        "informative_current_codebook_rows": informative & compatible,
     }
     for source_id, source in enumerate(SOURCES):
         selected = source_ids == source_id
@@ -155,6 +181,7 @@ def finalize(totals):
                 raise RuntimeError("Aggregate accounting invariant failed")
             stats["missing"] = stats["rows"] - stats["nonmissing"]
             stats["nonmissing_fraction"] = stats["nonmissing"] / stats["rows"] if stats["rows"] else None
+            stats["informative_fraction"] = stats["informative_nonempty_rows"] / stats["rows"] if stats["rows"] else None
             stats["evidence_fraction_of_nonempty"] = (stats["nonempty_with_evidence_rows"] / stats["nonempty"]
                                                        if stats["nonempty"] else None)
             stats["confidence_mean_finite_records"] = (stats["confidence_sum"] / stats["confidence_finite_records"]
@@ -204,7 +231,7 @@ def main():
     manifest = json.loads((common.DEST / "manifest.json").read_text())
     schema = json.loads((common.DEST / "persona_codes.schema.json").read_text())
     columns = schema["columns"]
-    positions = {column["id"]: (index, len(column["values"])) for index, column in enumerate(columns)}
+    positions = {column["id"]: (index, tuple(column["values"])) for index, column in enumerate(columns)}
     specs = [(field, *positions[field]) for field in FIELDS]
     totals = initialize(specs)
     rows = 0
@@ -237,8 +264,11 @@ def main():
               "source_rows": source_rows, "verified_files": verified,
               "by_source": finalize(totals), "by_group": finalize(grouped),
               "status": "availability_audit_complete",
-              "interpretation": {"nonmissing": "valid unmasked code or non-null override; overrides applied last",
+              "unavailable_markers": sorted(UNAVAILABLE_MARKERS),
+              "interpretation": {"nonmissing": "storage presence: valid unmasked code or non-null override; NOT informative availability",
                                  "nonempty": "nonmissing excluding final blank overrides",
+                                 "informative_nonempty_rows": "nonempty minus frozen explicit unavailable markers; legacy values still require mapping",
+                                 "current_codebook_compatible_rows": "exact membership in this revision's field codebook after overrides",
                                  "evidence": "at least one non-whitespace evidence string for that field",
                                  "confidence": "recorded metadata, not calibrated trust or independent verification",
                                  "direct": "source assignment tag, not independently verified truth"},
