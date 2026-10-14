@@ -82,7 +82,7 @@ def selected(split_name: str, pilot_config: dict, input_config: dict) -> tuple[t
         raise ValueError("selected row is absent from frozen features")
     selected_rows = tuple(by_id[row_id] for row_id in ids)
     counts = Counter(int(split.links[row_id]["campaign"]) for row_id in ids)
-    return selected_rows, {"campaign_counts": dict(sorted(counts.items())),
+    return selected_rows, {"campaign_counts": {str(k): v for k, v in sorted(counts.items())},
                            "selection_sha256": hashlib.sha256("\n".join(ids).encode()).hexdigest()}
 
 
@@ -137,7 +137,7 @@ def run(split_name: str, pilot_config: dict, input_config: dict) -> dict:
     score_counts = Counter(row["p_redeem"] for row in valid)
     largest_share = max(score_counts.values()) / len(valid) if valid else 1.0
     adequate_diversity = all(
-        len(by_camp_scores[campaign]) >= 3 for campaign, count in selection["campaign_counts"].items()
+        len(by_camp_scores[int(campaign)]) >= 3 for campaign, count in selection["campaign_counts"].items()
         if count >= 20
     ) and len(score_counts) > 1 and largest_share < 0.9
     legal_rate = len(valid) / len(outputs)
