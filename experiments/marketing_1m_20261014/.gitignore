@@ -1,0 +1,4 @@
+# Research documents and all execution artifacts remain local.
+*.md
+local_artifacts/
+__pycache__/
