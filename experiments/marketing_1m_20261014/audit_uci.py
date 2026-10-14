@@ -29,8 +29,13 @@ DOWNLOADS = (
     ("bank-additional.zip", f"{ORIGIN}/00222/bank-additional.zip", 500000),
     ("in-vehicle-coupon-recommendation.csv", f"{ORIGIN}/00603/in-vehicle-coupon-recommendation.csv", 2300000),
 )
-# On subsequent acquisitions this local receipt is the frozen snapshot contract;
-# files must match its fingerprints, never silently refreshed from a mutable URL.
+# First official acquisition, 2026-10-14: freeze bytes in code as well as locally.
+# These are observed SHA-256 fingerprints, not publisher-supplied checksums.
+SNAPSHOT = {
+    "bank.zip": (579043, "99d7e8eb12401ed278b793984423915411ea8df099e1795f9fefe254f513fe5e"),
+    "bank-additional.zip": (444572, "a607b5edab6c6c75ce09c39142a77702c38123bd5aa7ae89a63503bbe17d65cd"),
+    "in-vehicle-coupon-recommendation.csv": (2163456, "d47897367f5a12a31dece0f4e42d7bd9da76d7016b568da511b50335d08dcb43"),
+}
 EXCLUDED = frozenset({"y", "Y", "poutcome"})
 BANK = "age job marital education default balance housing loan contact day month duration campaign pdays previous poutcome y".split()
 ADDITIONAL = "age job marital education default housing loan contact month day_of_week duration campaign pdays previous poutcome emp.var.rate cons.price.idx cons.conf.idx euribor3m nr.employed y".split()
@@ -100,6 +105,8 @@ def acquire_all():
         if size == 0 or size > ceiling:
             raise RuntimeError(f"Invalid size: {name}")
         digest = fingerprint(target)
+        if (size, digest) != SNAPSHOT[name]:
+            raise RuntimeError(f"Downloaded bytes differ from the approved snapshot: {name}")
         if prior:
             old = {entry["path"]: entry for entry in prior["files"]}.get(name)
             if not old or old["sha256"] != digest or old["bytes"] != size:
