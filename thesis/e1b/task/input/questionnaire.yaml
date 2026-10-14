@@ -1,0 +1,12 @@
+schemaVersion: "1.0"
+id: thesis_coupon_restart_v1
+title: Household campaign coupon redemption
+description: One pre-campaign household response probability.
+askRationale: false
+askConfidence: false
+questions:
+  - id: p_redeem
+    prompt: What is the probability of at least one valid campaign coupon redemption during this campaign's complete valid period? Answer as a decimal string in [0,1].
+    type: free_text
+    construct: household_campaign_redemption_probability
+    required: true

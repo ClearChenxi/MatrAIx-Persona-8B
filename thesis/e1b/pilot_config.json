@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "status": "pending_pilot_scope_confirmation",
+  "model": "qwen3.5:9b",
+  "model_digest": "6488c96fa5faab64bb65cbd30d4289e20e6130ef535a93ef9a49f42eda893ea7",
+  "think": false,
+  "options": {
+    "temperature": 0,
+    "seed": 20261014,
+    "num_ctx": 8192,
+    "num_predict": 512,
+    "top_k": 20,
+    "top_p": 0.95,
+    "presence_penalty": 0
+  },
+  "D_sample_rows": 20,
+  "R_sample_rows": 100,
+  "maximum_retries_per_record": 2,
+  "D_sample_sha256": "e53898f77a9ec614aae48db00ff282ae0acc0ab2ef21fb550c56fd496b671091",
+  "R_groups_sha256": "e285008f99495375e358420ab1e4a06f030292c1efcd38bf716e2a96650c5f83"
+}
