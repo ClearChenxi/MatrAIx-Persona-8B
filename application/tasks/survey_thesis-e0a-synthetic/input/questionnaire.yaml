@@ -1,0 +1,12 @@
+schemaVersion: "1.0"
+id: thesis_e0a_synthetic_v1
+title: Synthetic household coupon redemption
+description: Technical check of pre-campaign household redemption probability, with no observed labels.
+askRationale: false
+askConfidence: false
+questions:
+  - id: p_redeem
+    prompt: What is the probability of at least one valid campaign coupon redemption over the complete campaign period? Answer as a decimal string in [0,1].
+    type: free_text
+    construct: household_campaign_redemption_probability
+    required: true

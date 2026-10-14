@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "official_commit": "3633d8dab149a9482a71b024418a49ae828cc941",
+  "model": "qwen3.5:9b",
+  "repetitions": 2,
+  "maximum_generations": 6,
+  "think": false,
+  "options": {"temperature": 0, "seed": 20261010, "num_ctx": 8192, "num_predict": 512, "top_k": 20, "top_p": 0.95, "presence_penalty": 0},
+  "profiles": [
+    {"id": "synthetic_a", "behavior": {"history_window_days": 84, "shopping_visits": 24, "days_since_last_purchase": 3, "target_category_purchase_visits": 18, "historical_completed_coupon_campaigns": 5, "historical_redeemed_coupon_campaigns": 3}},
+    {"id": "synthetic_b", "behavior": {"history_window_days": 84, "shopping_visits": 8, "days_since_last_purchase": 12, "target_category_purchase_visits": 2, "historical_completed_coupon_campaigns": 5, "historical_redeemed_coupon_campaigns": 1}},
+    {"id": "synthetic_c", "behavior": {"history_window_days": 84, "shopping_visits": 2, "days_since_last_purchase": 45, "target_category_purchase_visits": 0, "historical_completed_coupon_campaigns": 5, "historical_redeemed_coupon_campaigns": 0}}
+  ]
+}

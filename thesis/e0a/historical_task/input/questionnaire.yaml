@@ -1,0 +1,12 @@
+schemaVersion: "1.0"
+id: thesis_e0a_history_v1
+title: Historical household campaign interface check
+description: Label-free pre-campaign probability output; technical evidence only.
+askRationale: false
+askConfidence: false
+questions:
+  - id: p_redeem
+    prompt: What is the probability of at least one valid coupon redemption during the complete campaign period? Answer as a decimal string in [0,1].
+    type: free_text
+    construct: household_campaign_redemption_probability
+    required: true

@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "status": "restart_pending_e0b",
+  "execution_approved": false,
+  "approval_reference": "2026-10-14 restart requested; requires the new E0b run and source commitments before execution",
+  "branch": "thesis-restart-20261014",
+  "official_commit": "3633d8dab149a9482a71b024418a49ae828cc941",
+  "e0b_run": "PENDING_NEW_E0B_RUN",
+  "e0b_plan_sha256": "PENDING_NEW_E0B_PLAN_SHA256",
+  "history_window_days": 84,
+  "row_id_namespace": "thesis-e1-data-v1",
+  "vocabulary_fit_split": "D",
+  "unknown_category": "<UNKNOWN>",
+  "other_category": "<OTHER>",
+  "numeric_decimal_places": 6,
+  "money_decimal_places": 2,
+  "history_label_permissions": {
+    "D": ["D"],
+    "R": ["D"],
+    "T": ["D", "R"]
+  },
+  "test_transaction_policy": "for each T campaign use transaction rows in its own START_DAY-84 <= DAY < START_DAY window; never use T redemption labels",
+  "excluded_sources": ["coupon_redempt.csv", "hh_demographic.csv", "causal_data.csv", "labels_T_SEALED.csv", "label_summary_PRIVATE.json"],
+  "group_policy": {
+    "frequency": "D empirical nearest-rank 1/3 and 2/3 thresholds; boundary goes to lower group; repeated thresholds merge empty groups",
+    "historical_redemption": "D median among rows with at least one permitted prior completed campaign; boundary goes to low; zero prior campaigns is no_history",
+    "target_category_match": "D empirical nearest-rank 1/3 and 2/3 thresholds; boundary goes to lower group; repeated thresholds merge empty groups",
+    "low_support_rows": 30
+  },
+  "persona_policy": "deterministic rendering of observed household and campaign facts only; no identifiers, demographics, psychology, motives, outcome, coupon value, creative, image, or minimum-spend invention",
+  "manual_audit_sample_size": 20
+}

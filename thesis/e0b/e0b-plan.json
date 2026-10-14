@@ -1,0 +1,120 @@
+{
+  "schema_version": "1.0",
+  "status": "restart_pending_preflight",
+  "execution_approved": false,
+  "approval_reference": "2026-10-14 restart requested; the new E0b audit and label custody plan must be frozen before execution",
+  "dataset_source": {
+    "name": "dunnhumby The Complete Journey",
+    "official_page": "https://www.dunnhumby.com/source-files/",
+    "local_archive": "/Users/jiangchenxi/科研内容/matraix-thesis-feasibility/datasets/dunnhumby/dunnhumby_The-Complete-Journey.zip",
+    "prior_source_audit_date": "2026-09-22",
+    "use_boundary": "research/non-commercial; do not redistribute raw records"
+  },
+  "data_directory": "/Users/jiangchenxi/科研内容/matraix-thesis-feasibility/datasets/dunnhumby/dunnhumby_The-Complete-Journey/dunnhumby_The-Complete-Journey CSV",
+  "history_window_days": 84,
+  "target_campaign_types": ["TypeB", "TypeC"],
+  "splits": {
+    "D": ["27", "28", "29", "1", "2", "3", "4", "5", "6", "7"],
+    "R": ["9", "10", "11", "12"],
+    "T": ["14", "15", "16", "17", "19", "20", "21", "22", "23", "24", "25"]
+  },
+  "test_freeze_start_day": 531,
+  "evaluation_policy": {
+    "test_campaign_count": 11,
+    "minimum_final_evaluation_households_warning": 20,
+    "low_support_action": "flag_and_retain",
+    "primary_activity_metric": "Y1 average precision when identifiable; retain zero-positive and all-positive activities with explicit status",
+    "aggregation": "equal-weight activity macro average with denominator and complete activity list",
+    "inference_scope": "exploratory future-period response prediction; do not treat households as independent future campaigns"
+  },
+  "e2": {
+    "reserved": true,
+    "seed": 20261009,
+    "adaptation_fraction": 0.2,
+    "assignment": "sort unique eligible T households by sha256(seed:household_key), then household_key; first floor(fraction*N) are adaptation"
+  },
+  "label_policy": {
+    "primary": "Y1",
+    "y1": "at least one valid coupon_redempt row matching household, campaign, campaign coupon, and inclusive campaign dates",
+    "y2": "at least one legal positive purchase of a campaign target PRODUCT_ID during inclusive campaign dates",
+    "y3": "deferred until SALES_VALUE net/return semantics are independently confirmed",
+    "test_mode": "local_logical_seal",
+    "test_summaries_public": false
+  },
+  "official_commit": "3633d8dab149a9482a71b024418a49ae828cc941",
+  "branch": "thesis-restart-20261014",
+  "tables": {
+    "campaign_desc.csv": {
+      "headers": ["DESCRIPTION", "CAMPAIGN", "START_DAY", "END_DAY"],
+      "types": ["category", "identifier", "integer", "integer"],
+      "primary_key": ["CAMPAIGN"],
+      "time_role": "defines inclusive campaign outcome window and prediction cutoff",
+      "role": "campaign type and inclusive dates",
+      "main_input": true,
+      "semantic_access": "structure"
+    },
+    "campaign_table.csv": {
+      "headers": ["DESCRIPTION", "household_key", "CAMPAIGN"],
+      "types": ["category", "identifier", "identifier"],
+      "primary_key": ["household_key", "CAMPAIGN"],
+      "time_role": "participation assignment inherited from campaign dates",
+      "role": "confirmed campaign participation",
+      "main_input": true,
+      "semantic_access": "structure"
+    },
+    "coupon.csv": {
+      "headers": ["COUPON_UPC", "PRODUCT_ID", "CAMPAIGN"],
+      "types": ["identifier", "identifier", "identifier"],
+      "primary_key": ["CAMPAIGN", "COUPON_UPC", "PRODUCT_ID"],
+      "time_role": "campaign design known by the campaign prediction cutoff",
+      "role": "campaign coupon-product relation",
+      "main_input": true,
+      "semantic_access": "structure"
+    },
+    "product.csv": {
+      "headers": ["PRODUCT_ID", "MANUFACTURER", "DEPARTMENT", "BRAND", "COMMODITY_DESC", "SUB_COMMODITY_DESC", "CURR_SIZE_OF_PRODUCT"],
+      "types": ["identifier", "identifier", "category", "category", "category", "category", "text"],
+      "primary_key": ["PRODUCT_ID"],
+      "time_role": "static taxonomy; observation time not independently recorded",
+      "role": "product taxonomy and brand type",
+      "main_input": true,
+      "semantic_access": "structure"
+    },
+    "transaction_data.csv": {
+      "headers": ["household_key", "BASKET_ID", "DAY", "PRODUCT_ID", "QUANTITY", "SALES_VALUE", "STORE_ID", "RETAIL_DISC", "TRANS_TIME", "WEEK_NO", "COUPON_DISC", "COUPON_MATCH_DISC"],
+      "types": ["identifier", "identifier", "integer", "identifier", "decimal", "decimal", "identifier", "decimal", "integer", "integer", "decimal", "decimal"],
+      "primary_key": [],
+      "time_role": "DAY before START_DAY is history; campaign-window DAY is auxiliary outcome only",
+      "role": "pre-cutoff behavior and auxiliary post-campaign outcomes",
+      "main_input": "pre-cutoff only",
+      "semantic_access": "structure_and_behavior"
+    },
+    "coupon_redempt.csv": {
+      "headers": ["household_key", "DAY", "COUPON_UPC", "CAMPAIGN"],
+      "types": ["identifier", "integer", "identifier", "identifier"],
+      "primary_key": ["household_key", "CAMPAIGN", "DAY", "COUPON_UPC"],
+      "time_role": "completed D/R labels and sealed T labels within inclusive campaign dates",
+      "role": "historical labels and primary response label",
+      "main_input": "historical completed campaigns only",
+      "semantic_access": "label_custodian_only"
+    },
+    "hh_demographic.csv": {
+      "headers": ["classification_1", "classification_2", "classification_3", "HOMEOWNER_DESC", "classification_5", "classification_4", "KID_CATEGORY_DESC", "household_key"],
+      "types": ["anonymous_category", "anonymous_category", "anonymous_category", "anonymous_category", "anonymous_category", "anonymous_category", "anonymous_category", "identifier"],
+      "primary_key": ["household_key"],
+      "time_role": "observation time unverified; excluded from the primary analysis",
+      "role": "anonymous static attributes with unverified observation time",
+      "main_input": false,
+      "semantic_access": "registry_only"
+    },
+    "causal_data.csv": {
+      "headers": ["PRODUCT_ID", "STORE_ID", "WEEK_NO", "display", "mailer"],
+      "types": ["identifier", "identifier", "integer", "category", "category"],
+      "primary_key": ["PRODUCT_ID", "STORE_ID", "WEEK_NO"],
+      "time_role": "weekly store-level exposure without reliable household assignment; excluded",
+      "role": "store display and mailer without reliable household exposure",
+      "main_input": false,
+      "semantic_access": "registry_only"
+    }
+  }
+}
