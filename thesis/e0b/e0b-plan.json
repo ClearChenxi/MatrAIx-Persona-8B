@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "status": "restart_pending_preflight",
-  "execution_approved": false,
-  "approval_reference": "2026-10-14 restart requested; the new E0b audit and label custody plan must be frozen before execution",
+  "status": "confirmed",
+  "execution_approved": true,
+  "approval_reference": "2026-10-14 user confirmed a complete E0b rerun with the audited 84-day history window, Type B/C campaigns, existing D/R/T split, campaign 24 exclusion after coverage audit, and global 20/80 E2 household permissions",
   "dataset_source": {
     "name": "dunnhumby The Complete Journey",
     "official_page": "https://www.dunnhumby.com/source-files/",

@@ -1,8 +1,8 @@
 {
   "schema_version": "1.2",
-  "status": "restart_pending_preflight",
-  "execution_approved": false,
-  "approval_reference": "2026-10-14 restart requested; the new E0a historical run scope and maximum generations require explicit freeze before execution",
+  "status": "confirmed",
+  "execution_approved": true,
+  "approval_reference": "2026-10-14 user confirmed a complete E0a rerun: six synthetic calls plus campaign 29 twenty households times three calls, at most 66 local generations total; reuse the verified E0a code and existing fixed local Qwen configuration",
   "campaign": "29",
   "campaign_type": "TypeB",
   "start_day": 281,
