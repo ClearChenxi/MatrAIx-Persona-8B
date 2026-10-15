@@ -9,6 +9,7 @@ from fractions import Fraction
 from thesis.persona1m_audit.aggregate import (
     _midrank, _to_six_decimals, _weighted_distribution, prepare,
 )
+from thesis.persona1m_audit.verify_aggregate import _wire_record
 
 
 class AggregateTests(unittest.TestCase):
@@ -38,6 +39,13 @@ class AggregateTests(unittest.TestCase):
         result = _to_six_decimals((Fraction(1, 3), Fraction(2, 3)), 6)
         self.assertEqual(result, ("0.333333", "0.666667"))
         self.assertEqual(sum(Decimal(value) for value in result), 1)
+
+    def test_verifier_compares_serialized_arrays_not_python_tuples(self):
+        record = {"row_id": "invented", "human_aggregate": ("0.5", "0.5"),
+                  "synthetic_aggregate": ("0.2", "0.8")}
+        self.assertEqual(_wire_record(record), {"row_id": "invented",
+                                               "human_aggregate": ["0.5", "0.5"],
+                                               "synthetic_aggregate": ["0.2", "0.8"]})
 
     def test_requires_confirmation_before_reading_inputs(self):
         with self.assertRaisesRegex(ValueError, "not confirmed"):

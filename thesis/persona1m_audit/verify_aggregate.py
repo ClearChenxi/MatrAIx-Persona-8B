@@ -12,6 +12,15 @@ from thesis.persona1m_audit.aggregate import HERE, prepare
 from thesis.persona1m_audit.audit import _features
 
 
+def _wire_record(record: dict) -> dict:
+    """JSON encodes the builder's immutable tuples as arrays (Python lists)."""
+    return {
+        "row_id": record["row_id"],
+        "human_aggregate": list(record["human_aggregate"]),
+        "synthetic_aggregate": list(record["synthetic_aggregate"]),
+    }
+
+
 def verify(run: Path) -> dict:
     run = run.resolve(strict=True)
     config = json.loads((HERE / "aggregate_config.json").read_text(encoding="utf-8"))
@@ -54,7 +63,7 @@ def verify(run: Path) -> dict:
         records = [json.loads(line) for line in (run / f"summary_{split}_PRIVATE.jsonl").read_text(
             encoding="utf-8"
         ).splitlines()]
-        expected = replay["records"][split]
+        expected = [_wire_record(record) for record in replay["records"][split]]
         if (records != expected or report["rows"][split] != len(records)
                 or [row["row_id"] for row in records]
                 != [row["row_id"] for row in _features(input_config, split)]):
