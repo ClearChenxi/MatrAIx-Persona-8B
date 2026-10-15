@@ -1,6 +1,8 @@
 {
   "schema_version": "1.0",
-  "status": "pending_exact_formula_confirmation",
+  "status": "confirmed_D_R_aggregate_only",
+  "formula_confirmed_on": "2026-10-15",
+  "formula_confirmation": "User approved the exact D-midrank Bargain hunter and Frugal saver 2x-axis weak weights, source-preserving mixture, and D/R aggregate-only scope.",
   "source_coverage_report": "thesis/persona1m_audit/runs/coverage-20261014T124609.164458Z/report.json",
   "source_coverage_report_sha256": "21bafedfaadc8cd8b3f82e33bbd916954a9270fce1e9c5ae9a7f84db0be2a226",
   "expected_human_coded_rows": 3378,

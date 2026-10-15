@@ -55,9 +55,12 @@ and reports variation and D quantiles. It does not load D labels, R or T,
 Persona 1M rows, or a model; its purpose is to decide whether a weak proxy
 weighting proposal is even technically distinguishable across households.
 
-`aggregate.py` is a separate, currently **disabled** D/R-only preparation
+`aggregate.py` is a separate, user-confirmed D/R-only preparation
 step. It consumes only the pinned source-by-category counts from the complete
 release audit plus hash-verified D/R X, not any individual Persona 1M record.
 The exact midrank/weak-weight formula is documented in the E1b extension draft
-and covered by invented-data tests. Its config stays pending until the user
-confirms the exact formula; it cannot execute or call a model in that state.
+and covered by invented-data tests. The confirmed `aggregate_config.json`
+still forbids labels, T access, individual Persona rows and all model calls.
+Execution requires a clean version already pushed to the experiment branch.
+`verify_aggregate.py` checks the local file hashes, each D/R row and all
+rounded 20-category distributions against a read-only replay.
